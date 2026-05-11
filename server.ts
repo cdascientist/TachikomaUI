@@ -163,6 +163,26 @@ async function startServer() {
     }
   });
 
+  // ========== OPENCLAW PROXY (so browser clients work from anywhere) ==========
+
+  app.use("/api/openclaw/v1", async (req, res) => {
+    try {
+      const target = `http://127.0.0.1:8000/v1${req.url}`;
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (typeof v === "string" && !["host", "connection"].includes(k.toLowerCase())) {
+          headers[k] = v;
+        }
+      }
+      const body = req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined;
+      const fetchRes = await fetch(target, { method: req.method, headers: { ...headers, "Content-Type": "application/json" }, body });
+      const text = await fetchRes.text();
+      res.status(fetchRes.status).set("Content-Type", fetchRes.headers.get("Content-Type") || "application/json").send(text);
+    } catch (err: any) {
+      res.status(502).json({ error: "OpenClaw gateway unreachable", detail: err.message });
+    }
+  });
+
   // ========== SYSTEM SERVICES & RESOURCES ==========
 
   app.get("/api/system/services", (req, res) => {

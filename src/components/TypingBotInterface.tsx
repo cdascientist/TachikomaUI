@@ -77,7 +77,7 @@ export const TypingBotInterface: React.FC = React.memo(() => {
                     url = url || 'https://api.deepseek.com/v1';
                     model = 'deepseek-chat';
                 } else if (provider === 'openclaw') {
-                    url = url || 'http://localhost:8000/v1';
+                    url = url || '/api/openclaw/v1';
                     model = 'openclaw-agent';
                 }
 
