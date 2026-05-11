@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import List from "@mui/joy/List";
-import ListItem from "@mui/joy/ListItem";
-import ListItemButton from "@mui/joy/ListItemButton";
-import ListItemContent from "@mui/joy/ListItemContent";
-import Textarea from "@mui/joy/Textarea";
-import Button from "@mui/joy/Button";
-import Chip from "@mui/joy/Chip";
-import Typography from "@mui/joy/Typography";
-import Stack from "@mui/joy/Stack";
-import Snackbar from "@mui/joy/Snackbar";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
 import { Save, FileText, FileWarning } from "lucide-react";
@@ -59,77 +49,76 @@ export const MemoryEditorPage: React.FC = () => {
 
   return (
     <ConfigPageShell title="Memory Editor" description="Workspace soul files — edit markdown memories, identity, and skill definitions" accentColor="fuchsia" loading={loading} error={error} onRetry={refetchFiles}>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: "flex-start" }}>
-        <motion.div style={{ width: "100%", maxWidth: 280, flexShrink: 0 }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
-          <Typography level="title-sm" fontFamily="monospace" startDecorator={<FileText size={16} />} sx={{ color: "#e2e8f0", mb: 1 }}>
-            Workspace Files
-          </Typography>
-          <List variant="outlined" sx={{ borderRadius: 12, borderColor: "rgba(192,38,211,0.2)", bg: "rgba(192,38,211,0.03)", maxHeight: 420, overflow: "auto" }}>
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* File List */}
+        <motion.div className="w-full md:w-60 flex-shrink-0" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+          <div className="flex items-center gap-2 mb-2">
+            <FileText size={15} className="text-fuchsia-400" />
+            <h3 className="text-xs font-mono text-gray-200 uppercase tracking-wider">Workspace Files</h3>
+          </div>
+          <div className="border border-fuchsia-500/20 rounded-xl bg-fuchsia-900/5 overflow-hidden">
             {fileList.map(f => (
-              <ListItem key={f.name}>
-                <ListItemButton
-                  selected={selectedFile === f.name}
-                  onClick={() => setSelectedFile(f.name)}
-                  sx={{ borderRadius: 8, fontFamily: "monospace", fontSize: 13 }}
-                >
-                  <ListItemContent>{f.name}</ListItemContent>
-                  <Chip size="sm" variant="soft" sx={{ fontFamily: "monospace", fontSize: 10 }}>
-                    {(f.size / 1024).toFixed(1)} KB
-                  </Chip>
-                </ListItemButton>
-              </ListItem>
+              <button
+                key={f.name}
+                onClick={() => setSelectedFile(f.name)}
+                className={`w-full text-left px-3 py-2 font-mono text-xs transition-colors flex justify-between items-center ${selectedFile === f.name ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'text-gray-400 hover:bg-fuchsia-500/10 hover:text-gray-200'}`}
+              >
+                <span>{f.name}</span>
+                <span className="text-[10px] text-gray-600">{(f.size / 1024).toFixed(1)}K</span>
+              </button>
             ))}
             {fileList.length === 0 && (
-              <ListItem><Typography level="body-sm" fontFamily="monospace" sx={{ color: "#6b7280" }}>No files found</Typography></ListItem>
+              <div className="text-gray-500 font-mono text-xs p-3">No files found</div>
             )}
-          </List>
+          </div>
         </motion.div>
 
-        <motion.div style={{ flex: 1, width: "100%" }} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+        {/* Editor */}
+        <motion.div className="flex-1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
           {selectedFile ? (
             <>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <Chip variant="solid" size="sm" sx={{ fontFamily: "monospace", bg: "#c026d340", color: "#e879f9" }}>{selectedFile}</Chip>
-                {isDirty && <Chip size="sm" variant="soft" color="warning" startDecorator={<FileWarning size={12} />} sx={{ fontFamily: "monospace" }}>Modified</Chip>}
-              </Stack>
-              <Textarea
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 text-fuchsia-300 font-mono text-xs">{selectedFile}</span>
+                {isDirty && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-mono text-[10px] uppercase">
+                    <FileWarning size={10} /> Modified
+                  </span>
+                )}
+              </div>
+              <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                minRows={14}
-                maxRows={22}
-                sx={{
-                  fontFamily: "monospace", fontSize: 13, lineHeight: 1.6,
-                  bg: "rgba(0,0,0,0.6)", borderColor: "rgba(192,38,211,0.2)",
-                  color: "#e2e8f0", borderRadius: 12, mb: 1.5,
-                  "&:focus-within": { borderColor: "#c026d3" },
-                }}
+                rows={16}
+                className="w-full bg-black/60 border border-fuchsia-500/20 rounded-xl p-3 font-mono text-sm text-gray-200 resize-none focus:outline-none focus:border-fuchsia-400/60 placeholder-gray-600 leading-relaxed"
               />
-              <Button
+              <button
                 onClick={handleSave}
-                loading={saving}
-                startDecorator={<Save size={16} />}
-                disabled={!isDirty}
-                sx={{
-                  fontFamily: "monospace", fontSize: 13, textTransform: "uppercase", letterSpacing: "0.1em",
-                  bg: isDirty ? "#c026d3" : "#374151", "&:hover": { bg: isDirty ? "#a21caf" : "#4b5563" },
-                }}
+                disabled={!isDirty || saving}
+                className={`mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl font-mono text-xs uppercase tracking-widest transition-all ${isDirty ? 'bg-fuchsia-600/30 hover:bg-fuchsia-600/50 border border-fuchsia-500/40 text-fuchsia-300' : 'bg-gray-700/50 border border-gray-600/30 text-gray-500 cursor-not-allowed'}`}
               >
-                Save {selectedFile}
-              </Button>
+                {saving ? (
+                  <span className="animate-pulse">Saving...</span>
+                ) : (
+                  <><Save size={14} /> Save {selectedFile}</>
+                )}
+              </button>
             </>
           ) : (
-            <Stack alignItems="center" justifyContent="center" sx={{ height: 300 }}>
-              <FileText size={48} style={{ color: "#6b7280", marginBottom: 12 }} />
-              <Typography level="body-md" fontFamily="monospace" sx={{ color: "#6b7280" }}>
-                Select a file from the list to edit
-              </Typography>
-            </Stack>
+            <div className="flex flex-col items-center justify-center h-64 text-gray-600 gap-3">
+              <FileText size={48} />
+              <span className="font-mono text-sm">Select a file from the list to edit</span>
+            </div>
           )}
         </motion.div>
-      </Stack>
-      <Snackbar open={!!saveMsg} color="success" variant="solid" autoHideDuration={2500} onClose={() => setSaveMsg("")} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        {saveMsg}
-      </Snackbar>
+      </div>
+
+      {/* Save Toast */}
+      {saveMsg && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-900/80 border border-green-500/40 text-green-300 font-mono text-sm px-4 py-2 rounded-xl backdrop-blur-lg z-50">
+          {saveMsg}
+        </motion.div>
+      )}
     </ConfigPageShell>
   );
 };

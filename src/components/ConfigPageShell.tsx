@@ -1,10 +1,5 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import Sheet from "@mui/joy/Sheet";
-import Typography from "@mui/joy/Typography";
-import Skeleton from "@mui/joy/Skeleton";
-import Alert from "@mui/joy/Alert";
-import Button from "@mui/joy/Button";
 import { RefreshCw } from "lucide-react";
 
 interface ConfigPageShellProps {
@@ -17,12 +12,12 @@ interface ConfigPageShellProps {
   children: React.ReactNode;
 }
 
-const accentMap: Record<string, { border: string; text: string; bg: string }> = {
-  cyan:    { border: "#06b6d4", text: "#22d3ee", bg: "rgba(6,182,212,0.06)" },
-  fuchsia: { border: "#c026d3", text: "#e879f9", bg: "rgba(192,38,211,0.06)" },
-  yellow:  { border: "#ca8a04", text: "#facc15", bg: "rgba(202,138,4,0.06)" },
-  green:   { border: "#16a34a", text: "#4ade80", bg: "rgba(22,163,74,0.06)" },
-  purple:  { border: "#9333ea", text: "#c084fc", bg: "rgba(147,51,234,0.06)" },
+const accentMap: Record<string, { border: string; text: string; glow: string; bg: string; shadow: string }> = {
+  cyan:    { border: "border-cyan-500/30", text: "text-cyan-400", glow: "shadow-[0_0_30px_rgba(0,255,255,0.08)]", bg: "from-black/85 to-cyan-950/20", shadow: "shadow-cyan-500/5" },
+  fuchsia: { border: "border-fuchsia-500/30", text: "text-fuchsia-400", glow: "shadow-[0_0_30px_rgba(255,0,255,0.08)]", bg: "from-black/85 to-fuchsia-950/20", shadow: "shadow-fuchsia-500/5" },
+  yellow:  { border: "border-yellow-500/30", text: "text-yellow-400", glow: "shadow-[0_0_30px_rgba(255,255,0,0.08)]", bg: "from-black/85 to-yellow-950/20", shadow: "shadow-yellow-500/5" },
+  green:   { border: "border-green-500/30", text: "text-green-400", glow: "shadow-[0_0_30px_rgba(0,255,0,0.08)]", bg: "from-black/85 to-green-950/20", shadow: "shadow-green-500/5" },
+  purple:  { border: "border-purple-500/30", text: "text-purple-400", glow: "shadow-[0_0_30px_rgba(168,85,247,0.08)]", bg: "from-black/85 to-purple-950/20", shadow: "shadow-purple-500/5" },
 };
 
 export const ConfigPageShell: React.FC<ConfigPageShellProps> = ({
@@ -36,39 +31,30 @@ export const ConfigPageShell: React.FC<ConfigPageShellProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", padding: "16px" }}
+      className="flex justify-center items-center h-full p-4"
     >
-      <Sheet
-        variant="outlined"
-        sx={{
-          width: "100%", maxWidth: 900, maxHeight: "80vh", overflow: "auto",
-          borderRadius: 24, p: 4,
-          background: `linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(10,10,30,0.9) 100%)`,
-          backdropFilter: "blur(20px)",
-          border: `1px solid ${c.border}40`,
-          boxShadow: `0 0 30px ${c.border}15, inset 0 1px 0 ${c.border}10`,
-        }}
-      >
-        <Typography level="h2" fontFamily="monospace" sx={{ color: c.text, textTransform: "uppercase", letterSpacing: "0.15em", mb: 0.5, fontSize: { xs: "1.25rem", md: "1.75rem" } }}>
+      <div className={`w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-3xl p-6 md:p-8 bg-gradient-to-b ${c.bg} backdrop-blur-xl border ${c.border} ${c.glow} pointer-events-auto custom-scrollbar`}>
+        <h2 className={`text-xl md:text-2xl font-mono ${c.text} drop-shadow-md uppercase tracking-widest mb-1`}>
           {title}
-        </Typography>
-        <Typography level="body-sm" fontFamily="monospace" sx={{ color: "#9ca3af", mb: 3, pl: 1.5, borderLeft: `2px solid ${c.border}40` }}>
+        </h2>
+        <p className={`text-gray-400 font-mono text-xs mb-6 border-l-2 ${c.border} pl-3`}>
           {description}
-        </Typography>
+        </p>
 
         <AnimatePresence mode="wait">
           {loading ? (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Skeleton variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 12 }} />
-              <Skeleton variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 12 }} />
-              <Skeleton variant="rectangular" height={60} sx={{ mb: 1, borderRadius: 12 }} />
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+              <div className="h-14 bg-gray-800/50 rounded-xl animate-pulse" />
+              <div className="h-14 bg-gray-800/50 rounded-xl animate-pulse" />
+              <div className="h-14 bg-gray-800/50 rounded-xl animate-pulse" />
             </motion.div>
           ) : error ? (
-            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Alert color="danger" variant="soft" sx={{ mb: 2 }}
-                endDecorator={<Button size="sm" color="danger" variant="solid" onClick={onRetry} startDecorator={<RefreshCw size={14} />}>Retry</Button>}>
-                {error}
-              </Alert>
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="bg-red-900/30 border border-red-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
+              <span className="text-red-400 font-mono text-sm">{error}</span>
+              <button onClick={onRetry} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/30 hover:bg-red-600/50 border border-red-500/40 rounded-lg text-red-300 font-mono text-xs uppercase tracking-wider transition-colors">
+                <RefreshCw size={14} /> Retry
+              </button>
             </motion.div>
           ) : (
             <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -76,7 +62,7 @@ export const ConfigPageShell: React.FC<ConfigPageShellProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-      </Sheet>
+      </div>
     </motion.div>
   );
 };

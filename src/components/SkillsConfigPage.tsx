@@ -1,11 +1,5 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import Card from "@mui/joy/Card";
-import Switch from "@mui/joy/Switch";
-import Typography from "@mui/joy/Typography";
-import Chip from "@mui/joy/Chip";
-import Stack from "@mui/joy/Stack";
-import Divider from "@mui/joy/Divider";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
 import { Puzzle, Wrench, Zap } from "lucide-react";
@@ -21,15 +15,10 @@ export const SkillsConfigPage: React.FC = () => {
     if (!data) return;
     setToggling(pluginKey);
     try {
-      const updates = {
-        plugins: {
-          entries: { [pluginKey]: { enabled: !currentEnabled } }
-        }
-      };
       await fetch("/api/openclaw/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({ plugins: { entries: { [pluginKey]: { enabled: !currentEnabled } } } }),
       });
       refetch();
     } finally {
@@ -40,52 +29,57 @@ export const SkillsConfigPage: React.FC = () => {
   const plugins = data?.plugins?.entries || {};
   const tools = data?.tools || {};
   const pluginKeys = Object.keys(plugins);
+  const hasWebSearch = tools?.web?.search?.enabled;
 
   return (
     <ConfigPageShell title="Skills Config" description="Plugin registry, tool enablement, and skill runtime settings from OpenClaw" accentColor="cyan" loading={loading} error={error} onRetry={refetch}>
-      <motion.div variants={container} initial="hidden" animate="show">
-        <Typography level="title-lg" fontFamily="monospace" startDecorator={<Puzzle size={18} />} sx={{ color: "#e2e8f0", mb: 1.5 }}>
-          Plugins
-        </Typography>
-        <Stack spacing={1.5} sx={{ mb: 3 }}>
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
+        {/* Plugins */}
+        <div className="flex items-center gap-2 mb-1">
+          <Puzzle size={16} className="text-cyan-400" />
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Plugins</h3>
+        </div>
+        <div className="space-y-2">
           {pluginKeys.map(key => (
-            <motion.div key={key} variants={item} whileHover={{ scale: 1.01 }}>
-              <Card variant="outlined" sx={{ p: 2, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 12, borderColor: "rgba(6,182,212,0.2)", bg: "rgba(6,182,212,0.03)" }}>
-                <div>
-                  <Typography fontFamily="monospace" level="title-sm" sx={{ color: "#e2e8f0" }}>{key}</Typography>
-                  <Typography level="body-xs" fontFamily="monospace" sx={{ color: "#6b7280" }}>
-                    {plugins[key]?.enabled ? "Active" : "Disabled"}
-                  </Typography>
+            <motion.div key={key} variants={item} whileHover={{ scale: 1.01 }}
+              className="flex items-center justify-between p-3 rounded-xl border border-cyan-500/20 bg-cyan-900/5">
+              <div>
+                <div className="text-sm font-mono text-gray-200">{key}</div>
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+                  {plugins[key]?.enabled ? "Active" : "Disabled"}
                 </div>
-                <Switch
-                  checked={!!plugins[key]?.enabled}
-                  disabled={toggling === key}
-                  onChange={() => handleToggle(key, !!plugins[key]?.enabled)}
-                  sx={{ "--Switch-trackBackground": plugins[key]?.enabled ? "#06b6d4" : "#374151" }}
-                />
-              </Card>
+              </div>
+              <button
+                onClick={() => handleToggle(key, !!plugins[key]?.enabled)}
+                disabled={toggling === key}
+                className={`w-12 h-6 rounded-full transition-colors relative ${plugins[key]?.enabled ? 'bg-cyan-500/80' : 'bg-gray-700'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${plugins[key]?.enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
             </motion.div>
           ))}
           {pluginKeys.length === 0 && (
-            <Typography level="body-sm" fontFamily="monospace" sx={{ color: "#6b7280" }}>No plugins configured</Typography>
+            <div className="text-gray-500 font-mono text-sm p-3">No plugins configured</div>
           )}
-        </Stack>
+        </div>
 
-        <Divider sx={{ my: 2, borderColor: "rgba(6,182,212,0.15)" }} />
+        <hr className="border-cyan-500/15 my-4" />
 
-        <Typography level="title-lg" fontFamily="monospace" startDecorator={<Wrench size={18} />} sx={{ color: "#e2e8f0", mb: 1.5 }}>
-          Tools
-        </Typography>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {tools?.web?.search?.enabled && (
-            <Chip variant="soft" color="primary" startDecorator={<Zap size={12} />} sx={{ fontFamily: "monospace" }}>
-              Web Search ({tools.web.search.provider})
-            </Chip>
+        {/* Tools */}
+        <div className="flex items-center gap-2 mb-1">
+          <Wrench size={16} className="text-cyan-400" />
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Tools</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {hasWebSearch && (
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-900/10 text-cyan-300 font-mono text-xs">
+              <Zap size={12} /> Web Search ({tools.web.search.provider})
+            </span>
           )}
-          {Object.keys(tools).length === 0 && (
-            <Typography level="body-sm" fontFamily="monospace" sx={{ color: "#6b7280" }}>No tools configured</Typography>
+          {!hasWebSearch && Object.keys(tools).length === 0 && (
+            <span className="text-gray-500 font-mono text-sm">No tools configured</span>
           )}
-        </Stack>
+        </div>
       </motion.div>
     </ConfigPageShell>
   );

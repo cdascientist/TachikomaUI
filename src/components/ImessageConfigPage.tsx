@@ -1,18 +1,10 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import Table from "@mui/joy/Table";
-import Typography from "@mui/joy/Typography";
-import Card from "@mui/joy/Card";
-import Chip from "@mui/joy/Chip";
-import Button from "@mui/joy/Button";
-import Stack from "@mui/joy/Stack";
-import Snackbar from "@mui/joy/Snackbar";
-import Divider from "@mui/joy/Divider";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
-import { MessageCircle, Send, AlertTriangle, CheckCircle, Clock, Zap } from "lucide-react";
+import { MessageCircle, CheckCircle, Clock, AlertTriangle, Zap, Send } from "lucide-react";
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const containerAnim = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const rowItem = { hidden: { opacity: 0, x: -10 }, show: { opacity: 1, x: 0 } };
 
 interface LogEntry { id: string; from_number: string; to_number: string; content: string; direction: string; status: string; created_at: string }
@@ -42,84 +34,100 @@ export const ImessageConfigPage: React.FC = () => {
   const logEntries = log || [];
 
   const statCards = [
-    { label: "Total (7d)", value: s.total, icon: <MessageCircle size={20} />, color: "#06b6d4" },
-    { label: "Responded", value: s.responded, icon: <CheckCircle size={20} />, color: "#22c55e" },
-    { label: "Pending", value: s.pending, icon: <Clock size={20} />, color: "#f59e0b" },
-    { label: "Failed", value: s.failed, icon: <AlertTriangle size={20} />, color: "#ef4444" },
+    { label: "Total (7d)", value: s.total, icon: <MessageCircle size={18} />, color: "cyan" },
+    { label: "Responded", value: s.responded, icon: <CheckCircle size={18} />, color: "green" },
+    { label: "Pending", value: s.pending, icon: <Clock size={18} />, color: "yellow" },
+    { label: "Failed", value: s.failed, icon: <AlertTriangle size={18} />, color: "red" },
   ];
+
+  const colorClasses: Record<string, { card: string; text: string }> = {
+    cyan:   { card: "border-cyan-500/20 bg-cyan-900/5", text: "text-cyan-400" },
+    green:  { card: "border-green-500/20 bg-green-900/5", text: "text-green-400" },
+    yellow: { card: "border-yellow-500/20 bg-yellow-900/5", text: "text-yellow-400" },
+    red:    { card: "border-red-500/20 bg-red-900/5", text: "text-red-400" },
+  };
 
   return (
     <ConfigPageShell title="iMessage Config" description="SendBlue relay status, message log, delivery stats, and force-respond controls" accentColor="green" loading={statsLoading && logLoading} error={null} onRetry={() => { refetchStats(); refetchLog(); }}>
-      <motion.div variants={container} initial="hidden" animate="show">
+      <motion.div variants={containerAnim} initial="hidden" animate="show" className="space-y-4">
         {/* Stats Row */}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2.5 }}>
-          {statCards.map(card => (
-            <motion.div key={card.label} style={{ flex: 1 }} variants={rowItem}>
-              <Card variant="outlined" sx={{ p: 2, textAlign: "center", borderRadius: 12, borderColor: `${card.color}30`, bg: `${card.color}08` }}>
-                <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 0.5, color: card.color }}>
-                  {card.icon}
-                </Stack>
-                <Typography level="h3" fontFamily="monospace" sx={{ color: "#e2e8f0", fontSize: "1.5rem" }}>
-                  {card.value}
-                </Typography>
-                <Typography level="body-xs" fontFamily="monospace" sx={{ color: "#9ca3af" }}>{card.label}</Typography>
-              </Card>
-            </motion.div>
-          ))}
-        </Stack>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {statCards.map(card => {
+            const cls = colorClasses[card.color];
+            return (
+              <motion.div key={card.label} variants={rowItem}
+                className={`p-3 rounded-xl border ${cls.card} text-center`}>
+                <div className={`flex justify-center mb-1 ${cls.text}`}>{card.icon}</div>
+                <div className="text-xl font-mono text-gray-200 font-bold">{card.value}</div>
+                <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">{card.label}</div>
+              </motion.div>
+            );
+          })}
+        </div>
 
-        <Divider sx={{ my: 2, borderColor: "rgba(22,163,74,0.15)" }} />
+        <hr className="border-green-500/15 my-4" />
 
-        {/* Force Controls */}
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-          <Typography level="title-lg" fontFamily="monospace" startDecorator={<Send size={18} />} sx={{ color: "#e2e8f0" }}>
-            Message Log
-          </Typography>
-          <Button
-            size="sm"
-            loading={forcing}
+        {/* Force + Log Header */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Send size={16} className="text-green-400" />
+            <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Message Log</h3>
+          </div>
+          <button
             onClick={handleForce}
-            color="warning"
-            variant="solid"
-            startDecorator={<Zap size={14} />}
-            sx={{ fontFamily: "monospace", fontSize: 12, textTransform: "uppercase" }}
+            disabled={forcing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/40 rounded-lg text-yellow-300 font-mono text-xs uppercase tracking-wider transition-colors"
           >
-            Force All
-          </Button>
-        </Stack>
+            <Zap size={12} /> {forcing ? "Forcing..." : "Force All"}
+          </button>
+        </div>
 
         {/* Log Table */}
-        <Table variant="outlined" sx={{ borderRadius: 12, borderColor: "rgba(22,163,74,0.2)", maxHeight: 360, overflow: "auto", display: "block", "& th": { fontFamily: "monospace", fontSize: 11, color: "#4ade80" }, "& td": { fontFamily: "monospace", fontSize: 12 }, "& tbody": { display: "block" }, "& thead": { display: "block" } }}>
-          <thead><tr><th style={{ width: 130 }}>From</th><th style={{ width: 200 }}>Content</th><th style={{ width: 80 }}>Dir</th><th style={{ width: 90 }}>Status</th><th style={{ width: 140 }}>Time</th></tr></thead>
-          <tbody style={{ display: "block", maxHeight: 300, overflow: "auto" }}>
-            {logEntries.map(entry => (
-              <motion.tr key={entry.id} variants={rowItem}>
-                <td style={{ width: 130, color: "#e2e8f0" }}>{entry.from_number}</td>
-                <td style={{ width: 200, color: "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200, display: "inline-block" }}>
-                  {entry.content || "—"}
-                </td>
-                <td style={{ width: 80 }}>
-                  <Chip size="sm" variant="soft" color={entry.direction === "inbound" ? "primary" : "neutral"} sx={{ fontFamily: "monospace", fontSize: 10 }}>
-                    {entry.direction}
-                  </Chip>
-                </td>
-                <td style={{ width: 90 }}>
-                  <Chip size="sm" variant="soft" color={entry.status === "responded" ? "success" : entry.status === "failed" ? "danger" : "warning"} sx={{ fontFamily: "monospace", fontSize: 10 }}>
-                    {entry.status}
-                  </Chip>
-                </td>
-                <td style={{ width: 140, color: "#6b7280", fontSize: 11 }}>{entry.created_at ? new Date(entry.created_at).toLocaleString() : "—"}</td>
-              </motion.tr>
-            ))}
-            {logEntries.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", color: "#6b7280", padding: 16 }}>No messages in log</td></tr>
-            )}
-          </tbody>
-        </Table>
+        <div className="border border-green-500/20 rounded-xl overflow-hidden max-h-72 overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left">
+            <thead className="bg-green-900/10 sticky top-0">
+              <tr className="font-mono text-[10px] text-green-400 uppercase tracking-wider">
+                <th className="p-2">From</th>
+                <th className="p-2 max-w-[180px]">Content</th>
+                <th className="p-2">Dir</th>
+                <th className="p-2">Status</th>
+                <th className="p-2 hidden md:table-cell">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logEntries.map(entry => (
+                <motion.tr key={entry.id} variants={rowItem} className="border-t border-green-500/10 hover:bg-green-500/5">
+                  <td className="p-2 text-xs font-mono text-gray-300">{entry.from_number}</td>
+                  <td className="p-2 text-xs font-mono text-gray-400 max-w-[180px] truncate block">{entry.content || "—"}</td>
+                  <td className="p-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase ${entry.direction === 'inbound' ? 'bg-cyan-900/40 text-cyan-400' : 'bg-gray-700/40 text-gray-400'}`}>
+                      {entry.direction}
+                    </span>
+                  </td>
+                  <td className="p-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase ${entry.status === 'responded' ? 'bg-green-900/40 text-green-400' : entry.status === 'failed' ? 'bg-red-900/40 text-red-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
+                      {entry.status}
+                    </span>
+                  </td>
+                  <td className="p-2 text-[10px] font-mono text-gray-500 hidden md:table-cell">
+                    {entry.created_at ? new Date(entry.created_at).toLocaleString() : "—"}
+                  </td>
+                </motion.tr>
+              ))}
+              {logEntries.length === 0 && (
+                <tr><td colSpan={5} className="p-4 text-center text-gray-500 font-mono text-sm">No messages in log</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </motion.div>
-      <Snackbar open={!!forceMsg} color="success" variant="solid" autoHideDuration={3000} onClose={() => setForceMsg("")} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        {forceMsg}
-      </Snackbar>
+
+      {forceMsg && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-900/80 border border-green-500/40 text-green-300 font-mono text-sm px-4 py-2 rounded-xl backdrop-blur-lg z-50">
+          {forceMsg}
+        </motion.div>
+      )}
     </ConfigPageShell>
   );
 };
