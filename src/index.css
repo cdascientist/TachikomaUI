@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --neon-cyan: #00ffff;
+  --neon-magenta: #ff00ff;
+  --dark-void: #050505;
+  --cyber-grid: rgba(0, 255, 255, 0.15);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--dark-void);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  color: #fff;
+  overflow: hidden; /* Fallback before fullpage kicks in */
+}
+
+/* Hyper-Optimized Preloader styling, inline css blocks render < 4ms locally */
+#parallel-preloader-container {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--dark-void);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease-out;
+}
+
+.glitch-loader-text {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5rem;
+  text-shadow: 2px 2px 0px var(--neon-magenta), -2px -2px 0px #000;
+  animation: hyperFastGlitchDrive 0.2s infinite;
+}
+
+@keyframes hyperFastGlitchDrive {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.5s ease-out forwards;
+}
+
+/* Tron background grid using pure CSS over hardware acceleration to save DOM cycles */
+.tron-css-hardware-grid-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    linear-gradient(var(--cyber-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cyber-grid) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+/* Ensure fullpage.js sections are transparent to show the underlying 3D canvas */
+.transparent-section {
+  background: transparent !important;
+}
+.fp-tableCell {
+  background: transparent !important;
+}
+
+.overflow-y-auto {
+  touch-action: pan-y !important;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.3);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.5);
+}
+
+.mask-image-fade {
+  mask-image: linear-gradient(to bottom, transparent, black 20%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%);
+}
+
+#fp-nav ul li a span, .fp-slidesNav ul li a span {
+    background: var(--neon-cyan) !important;
+    box-shadow: 0 0 10px var(--neon-cyan);
+}

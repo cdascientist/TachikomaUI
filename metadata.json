@@ -1,0 +1,9 @@
+{
+  "name": "3dTemplate- Tachikoma",
+  "description": "Base Template\n",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": []
+}
