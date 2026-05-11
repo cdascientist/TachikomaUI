@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion } from "motion/react";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
+import { apiUrl } from "../hooks/apiConfig";
 import { Puzzle, Wrench, Zap } from "lucide-react";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
@@ -15,7 +16,7 @@ export const SkillsConfigPage: React.FC = () => {
     if (!data) return;
     setToggling(pluginKey);
     try {
-      await fetch("/api/openclaw/config", {
+      await fetch(apiUrl("/api/openclaw/config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plugins: { entries: { [pluginKey]: { enabled: !currentEnabled } } } }),

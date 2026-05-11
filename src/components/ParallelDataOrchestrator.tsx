@@ -742,53 +742,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
               <ChatBotInterface />
             </div>
 
-            {/* ROOM 2: Skills Configuration */}
-            <div className="section transparent-section">
-              <SkillsConfigPage />
-            </div>
-
-            {/* ROOM 3: Memory Editor */}
-            <div className="section transparent-section">
-              <MemoryEditorPage />
-            </div>
-
-            {/* ROOM 4: Alert System Configuration */}
-            <div className="section transparent-section">
-              <AlertsConfigPage />
-            </div>
-
-            {/* ROOM 5: iMessage Relay Configuration */}
-            <div className="section transparent-section">
-              <ImessageConfigPage />
-            </div>
-
-            {/* ROOM 6: System Settings */}
-            <div className="section transparent-section">
-              <SystemConfigPage />
-            </div>
-
-            {/* ROOM 7: Payload Integration */}
-            <div className="section transparent-section fp-auto-height">
-              <div className="flex flex-col h-full justify-center items-center p-4 md:p-8 select-none py-20 min-h-screen">
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-mono text-cyan-400 mb-6 drop-shadow-[0_0_15px_#0ff] pointer-events-auto break-words w-full text-center shrink-0">
-                  DATA_INGESTION_HUB
-                </h2>
-                <div className="w-full max-w-4xl mx-auto flex flex-col gap-8 justify-center pb-20">
-                  <FileDropzone />
-                  <FileBrowser />
-                </div>
-              </div>
-            </div>
-
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-            {/* ROOM 8: Particle Sandbox */}
+            {/* ROOM 2: Particle Sandbox */}
             <div className="section transparent-section">
               <div className="flex flex-col md:flex-row h-full w-full pointer-events-none">
                 {/* Editor Pane (Left Side) */}
@@ -953,7 +907,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
               </div>
             </div>
 
-            {/* ROOM 9: Horizontal Video Flow */}
+            {/* ROOM 3: Horizontal Video Flow */}
             <div className="section transparent-section relative">
               {/* Custom Glowing Navigation Particles */}
               <button
@@ -1019,3 +973,49 @@ export const ParallelDataOrchestrator: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* ROOM 4: Skills Configuration */}
+            <div className="section transparent-section">
+              <SkillsConfigPage />
+            </div>
+
+            {/* ROOM 5: Memory Editor */}
+            <div className="section transparent-section">
+              <MemoryEditorPage />
+            </div>
+
+            {/* ROOM 6: Alert System Configuration */}
+            <div className="section transparent-section">
+              <AlertsConfigPage />
+            </div>
+
+            {/* ROOM 7: iMessage Relay Configuration */}
+            <div className="section transparent-section">
+              <ImessageConfigPage />
+            </div>
+
+            {/* ROOM 8: System Settings */}
+            <div className="section transparent-section">
+              <SystemConfigPage />
+            </div>
+
+            {/* ROOM 9: Payload Integration */}
+            <div className="section transparent-section fp-auto-height">
+              <div className="flex flex-col h-full justify-center items-center p-4 md:p-8 select-none py-20 min-h-screen">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-mono text-cyan-400 mb-6 drop-shadow-[0_0_15px_#0ff] pointer-events-auto break-words w-full text-center shrink-0">
+                  DATA_INGESTION_HUB
+                </h2>
+                <div className="w-full max-w-4xl mx-auto flex flex-col gap-8 justify-center pb-20">
+                  <FileDropzone />
+                  <FileBrowser />
+                </div>
+              </div>
+            </div>
+
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

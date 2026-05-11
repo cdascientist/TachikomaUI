@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { apiUrl } from '../hooks/apiConfig';
 
 const CONFIG = {
     SPEAK_ON_COMPLETE: false // Typing interface might not speak, but wait, "when the ai speaks the orb should glow bright and pulsate according to the words"
@@ -77,7 +78,7 @@ export const TypingBotInterface: React.FC = React.memo(() => {
                     url = url || 'https://api.deepseek.com/v1';
                     model = 'deepseek-chat';
                 } else if (provider === 'openclaw') {
-                    url = url || '/api/openclaw/v1';
+                    url = url || apiUrl('/api/openclaw/v1');
                     model = 'openclaw-agent';
                 }
 

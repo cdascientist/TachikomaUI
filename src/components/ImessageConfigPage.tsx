@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion } from "motion/react";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
+import { apiUrl } from "../hooks/apiConfig";
 import { MessageCircle, CheckCircle, Clock, AlertTriangle, Zap, Send } from "lucide-react";
 
 const containerAnim = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
@@ -19,7 +20,7 @@ export const ImessageConfigPage: React.FC = () => {
   const handleForce = async () => {
     setForcing(true);
     try {
-      const res = await fetch("/api/imessage/force", { method: "POST" });
+      const res = await fetch(apiUrl("/api/imessage/force"), { method: "POST" });
       const d = await res.json();
       setForceMsg(d.message || "Force sent");
       setTimeout(() => setForceMsg(""), 3000);

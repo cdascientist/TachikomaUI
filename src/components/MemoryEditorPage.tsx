@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
+import { apiUrl } from "../hooks/apiConfig";
 import { Save, FileText, FileWarning } from "lucide-react";
 
 interface WsFile { name: string; size: number; updatedAt: string }
@@ -18,7 +19,7 @@ export const MemoryEditorPage: React.FC = () => {
   useEffect(() => {
     if (!selectedFile) return;
     let cancelled = false;
-    fetch(`/api/workspace/file/${encodeURIComponent(selectedFile)}`)
+    fetch(apiUrl(`/api/workspace/file/${encodeURIComponent(selectedFile)}`))
       .then(r => r.json())
       .then((d: FileContent) => {
         if (!cancelled) { setContent(d.content); setOriginalContent(d.content); }
@@ -31,7 +32,7 @@ export const MemoryEditorPage: React.FC = () => {
     if (!selectedFile) return;
     setSaving(true);
     try {
-      await fetch(`/api/workspace/file/${encodeURIComponent(selectedFile)}`, {
+      await fetch(apiUrl(`/api/workspace/file/${encodeURIComponent(selectedFile)}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),

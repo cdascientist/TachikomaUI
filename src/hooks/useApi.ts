@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiUrl } from "./apiConfig";
 
 interface UseApiResult<T> {
   data: T | null;
@@ -7,7 +8,7 @@ interface UseApiResult<T> {
   refetch: () => void;
 }
 
-export function useApi<T>(url: string | null): UseApiResult<T> {
+export function useApi<T>(path: string | null): UseApiResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,14 +17,14 @@ export function useApi<T>(url: string | null): UseApiResult<T> {
   const refetch = useCallback(() => setTrigger(t => t + 1), []);
 
   useEffect(() => {
-    if (!url) {
+    if (!path) {
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(url)
+    fetch(apiUrl(path))
       .then(async res => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
@@ -31,7 +32,7 @@ export function useApi<T>(url: string | null): UseApiResult<T> {
       .then(json => { if (!cancelled) { setData(json); setLoading(false); } })
       .catch(err => { if (!cancelled) { setError(err.message); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [url, trigger]);
+  }, [path, trigger]);
 
   return { data, loading, error, refetch };
 }
