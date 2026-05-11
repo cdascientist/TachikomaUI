@@ -11,8 +11,11 @@ import { FileDropzone } from "./FileDropzone";
 import { FileBrowser } from "./FileBrowser";
 import { ChatBotInterface } from "./ChatBotInterface";
 import { InteractiveGesturePage } from "./InteractiveGesturePage";
-import { SystemConfigPanel } from "./SystemConfigPanel";
-import type { ConfigField } from "./SystemConfigPanel";
+import { SkillsConfigPage } from "./SkillsConfigPage";
+import { MemoryEditorPage } from "./MemoryEditorPage";
+import { AlertsConfigPage } from "./AlertsConfigPage";
+import { ImessageConfigPage } from "./ImessageConfigPage";
+import { SystemConfigPage } from "./SystemConfigPage";
 import fullpage from "fullpage.js";
 import "fullpage.js/dist/fullpage.min.css";
 
@@ -642,51 +645,6 @@ export const ParallelDataOrchestrator: React.FC = () => {
     };
   }, [isGlobalInitializationComplete]);
 
-  const skillsFields: ConfigField[] = [
-    { key: 'skills_active', label: 'Active Skills', type: 'toggle', value: true, hint: 'Enable/disable the skills subsystem' },
-    { key: 'skills_autoload', label: 'Auto-Load on Start', type: 'toggle', value: true },
-    { key: 'skills_max_concurrent', label: 'Max Concurrent Skills', type: 'number', value: 3, hint: 'Maximum skills running simultaneously' },
-    { key: 'skills_timeout', label: 'Skill Timeout (seconds)', type: 'number', value: 120 },
-    { key: 'skills_log_level', label: 'Log Level', type: 'select', value: 'info', options: [{ label: 'Debug', value: 'debug' }, { label: 'Info', value: 'info' }, { label: 'Warn', value: 'warn' }, { label: 'Error', value: 'error' }] },
-    { key: 'skills_registry', label: 'Skill Registry Path', type: 'text', value: '/root/.openclaw/skills', placeholder: 'Path to skill definitions' },
-  ];
-
-  const memoryFields: ConfigField[] = [
-    { key: 'memory_active', label: 'Memory System Active', type: 'toggle', value: true },
-    { key: 'memory_auto_save', label: 'Auto-Save Memories', type: 'toggle', value: true, hint: 'Automatically persist new memories' },
-    { key: 'memory_max_entries', label: 'Max Memory Entries', type: 'number', value: 500 },
-    { key: 'memory_retention_days', label: 'Retention Period (days)', type: 'number', value: 90 },
-    { key: 'memory_index_path', label: 'Memory Index Path', type: 'text', value: './memory/MEMORY.md', placeholder: 'Path to memory index' },
-    { key: 'memory_store_path', label: 'Memory Store Directory', type: 'text', value: './memory/', placeholder: 'Directory for memory files' },
-  ];
-
-  const alertFields: ConfigField[] = [
-    { key: 'alerts_active', label: 'Alert System Active', type: 'toggle', value: true },
-    { key: 'alerts_vmq_enabled', label: 'VMQ Alerts Enabled', type: 'toggle', value: true },
-    { key: 'alerts_imessage_enabled', label: 'iMessage Alerts Enabled', type: 'toggle', value: true },
-    { key: 'alerts_poll_interval', label: 'Poll Interval (seconds)', type: 'number', value: 30, hint: 'How often to check for new alerts' },
-    { key: 'alerts_max_retries', label: 'Max Delivery Retries', type: 'number', value: 3 },
-    { key: 'alerts_carousel_size', label: 'Carousel Size', type: 'number', value: 5, hint: 'Number of alerts per carousel cycle' },
-  ];
-
-  const imessageFields: ConfigField[] = [
-    { key: 'imessage_active', label: 'iMessage Relay Active', type: 'toggle', value: true },
-    { key: 'imessage_force_timeout', label: 'Force-Respond Timeout (s)', type: 'number', value: 180 },
-    { key: 'imessage_max_concurrent', label: 'Max Concurrent Agents', type: 'number', value: 1, hint: 'Max agents processing simultaneously' },
-    { key: 'imessage_memory_high', label: 'Memory High Limit (MB)', type: 'number', value: 768 },
-    { key: 'imessage_memory_max', label: 'Memory Max Limit (MB)', type: 'number', value: 1024 },
-    { key: 'imessage_log_retention', label: 'Log Retention (days)', type: 'number', value: 30 },
-  ];
-
-  const systemFields: ConfigField[] = [
-    { key: 'system_api_gemini', label: 'Gemini API Key', type: 'password', value: '', placeholder: 'sk-...' },
-    { key: 'system_api_deepseek', label: 'DeepSeek API Key', type: 'password', value: '', placeholder: 'sk-...' },
-    { key: 'system_api_brave', label: 'Brave API Key', type: 'password', value: '', placeholder: 'BSA...' },
-    { key: 'system_api_elevenlabs', label: 'ElevenLabs API Key', type: 'password', value: 'sk_65d9a9684d7a2b023abc71e3b9b6fbf612722803efa4bfae', placeholder: 'sk-...' },
-    { key: 'system_theme', label: 'UI Theme', type: 'select', value: 'cyberpunk', options: [{ label: 'Cyberpunk', value: 'cyberpunk' }, { label: 'Matrix', value: 'matrix' }, { label: 'Dark', value: 'dark' }] },
-    { key: 'system_auto_update', label: 'Auto-Update Poller', type: 'toggle', value: false },
-  ];
-
   return (
     <div className="relative w-full h-screen bg-[#050505] text-white overflow-hidden">
       {/* Conditional Sub-4ms First Paint Optimization Loader */}
@@ -784,7 +742,53 @@ export const ParallelDataOrchestrator: React.FC = () => {
               <ChatBotInterface />
             </div>
 
-            {/* ROOM 2: Particle Sandbox */}
+            {/* ROOM 2: Skills Configuration */}
+            <div className="section transparent-section">
+              <SkillsConfigPage />
+            </div>
+
+            {/* ROOM 3: Memory Editor */}
+            <div className="section transparent-section">
+              <MemoryEditorPage />
+            </div>
+
+            {/* ROOM 4: Alert System Configuration */}
+            <div className="section transparent-section">
+              <AlertsConfigPage />
+            </div>
+
+            {/* ROOM 5: iMessage Relay Configuration */}
+            <div className="section transparent-section">
+              <ImessageConfigPage />
+            </div>
+
+            {/* ROOM 6: System Settings */}
+            <div className="section transparent-section">
+              <SystemConfigPage />
+            </div>
+
+            {/* ROOM 7: Payload Integration */}
+            <div className="section transparent-section fp-auto-height">
+              <div className="flex flex-col h-full justify-center items-center p-4 md:p-8 select-none py-20 min-h-screen">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-mono text-cyan-400 mb-6 drop-shadow-[0_0_15px_#0ff] pointer-events-auto break-words w-full text-center shrink-0">
+                  DATA_INGESTION_HUB
+                </h2>
+                <div className="w-full max-w-4xl mx-auto flex flex-col gap-8 justify-center pb-20">
+                  <FileDropzone />
+                  <FileBrowser />
+                </div>
+              </div>
+            </div>
+
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+            {/* ROOM 8: Particle Sandbox */}
             <div className="section transparent-section">
               <div className="flex flex-col md:flex-row h-full w-full pointer-events-none">
                 {/* Editor Pane (Left Side) */}
@@ -949,7 +953,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
               </div>
             </div>
 
-            {/* ROOM 3: Horizontal Video Flow */}
+            {/* ROOM 9: Horizontal Video Flow */}
             <div className="section transparent-section relative">
               {/* Custom Glowing Navigation Particles */}
               <button
@@ -1015,79 +1019,3 @@ export const ParallelDataOrchestrator: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* ROOM 4: Skills Configuration */}
-            <div className="section transparent-section">
-              <SystemConfigPanel
-                title="SKILLS_CONFIG"
-                description="Manage skills subsystem: autoload behavior, concurrency limits, registry paths, and runtime options."
-                storageKey="tachikoma_skills_config"
-                fields={skillsFields}
-                accentColor="cyan"
-              />
-            </div>
-
-            {/* ROOM 5: Memory Configuration */}
-            <div className="section transparent-section">
-              <SystemConfigPanel
-                title="MEMORY_CONFIG"
-                description="Persistent memory system settings: retention policy, auto-save behavior, index and store paths."
-                storageKey="tachikoma_memory_config"
-                fields={memoryFields}
-                accentColor="fuchsia"
-              />
-            </div>
-
-            {/* ROOM 6: Alert System Configuration */}
-            <div className="section transparent-section">
-              <SystemConfigPanel
-                title="ALERT_CONFIG"
-                description="VMQ quant alert pipeline: polling interval, carousel delivery, iMessage notification settings."
-                storageKey="tachikoma_alerts_config"
-                fields={alertFields}
-                accentColor="yellow"
-              />
-            </div>
-
-            {/* ROOM 7: iMessage Relay Configuration */}
-            <div className="section transparent-section">
-              <SystemConfigPanel
-                title="IMESSAGE_CONFIG"
-                description="SendBlue iMessage relay: agent limits, memory constraints, force-respond timeout, log retention."
-                storageKey="tachikoma_imessage_config"
-                fields={imessageFields}
-                accentColor="green"
-              />
-            </div>
-
-            {/* ROOM 8: System Settings */}
-            <div className="section transparent-section">
-              <SystemConfigPanel
-                title="SYSTEM_CONFIG"
-                description="Global system settings: API keys, UI theme, auto-update behavior, and runtime preferences."
-                storageKey="tachikoma_system_config"
-                fields={systemFields}
-                accentColor="purple"
-              />
-            </div>
-
-            {/* ROOM 9: Payload Integration */}
-            <div className="section transparent-section fp-auto-height">
-              <div className="flex flex-col h-full justify-center items-center p-4 md:p-8 select-none py-20 min-h-screen">
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-mono text-cyan-400 mb-6 drop-shadow-[0_0_15px_#0ff] pointer-events-auto break-words w-full text-center shrink-0">
-                  DATA_INGESTION_HUB
-                </h2>
-                <div className="w-full max-w-4xl mx-auto flex flex-col gap-8 justify-center pb-20">
-                  <FileDropzone />
-                  <FileBrowser />
-                </div>
-              </div>
-            </div>
-
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};

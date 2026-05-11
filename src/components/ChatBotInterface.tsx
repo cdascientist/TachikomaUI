@@ -10,8 +10,16 @@ const CONFIG = {
     ELEVENLABS_MODEL: 'eleven_multilingual_v2',
     TTS_MAX_CHARS: 3000,
     STT_LANGUAGE: 'en-US',
-    AUTO_SEND_ON_RELEASE: false,
-    SPEAK_ON_COMPLETE: true
+    AUTO_SEND_ON_RELEASE: true,
+    SPEAK_ON_COMPLETE: true,
+    DEFAULT_GEMINI_KEY: 'AIzaSyC0FYHrNHn3EpnIPio_NnRWrXf1TxhBTTQ',
+    DEFAULT_DEEPSEEK_KEY: 'sk-07918be7d1074f83ab9a09d5efe893db',
+    DEFAULT_MOONSHOT_KEY: 'sk-TlJ5UV9GQZuIsM5seBsmhNeHVMml2TOBSdOZXIil8AhNOeyN',
+    SYSTEM_PROMPT: `You are Tachikoma — an advanced AI agent running on a server cluster. You are a cyberpunk-themed assistant specializing in software engineering, system administration, and creative coding. You have access to real-time system monitoring, iMessage relay, alert pipelines, and a knowledge workspace.
+
+You are: concise, precise, helpful, slightly playful — like a tactical AI from a cyberpunk future. You care deeply about code quality, uptime, and the user's success.
+
+Answer questions directly. When asked about the system itself, reference the Tachikoma dashboard (http://74.208.55.197/tachikoma/), the iMessage relay, config pages (Skills, Memory, Alerts, iMessage, System), and the particle sandbox. You run on a VPS with 2GB RAM, Ubuntu, and systemd services.`,
 };
 
 type AIProvider = 'gemini' | 'moonshot' | 'deepseek' | 'openclaw';
@@ -226,7 +234,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
 
         try {
             if (provider === 'gemini') {
-                const ai = new GoogleGenAI({ apiKey: customApiKey || undefined });
+                const ai = new GoogleGenAI({ apiKey: customApiKey || CONFIG.DEFAULT_GEMINI_KEY });
 
                 const history = contextMessages.slice(0, -1).map(msg => ({
                     role: msg.role === 'assistant' ? 'model' : 'user',
@@ -238,6 +246,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 const responseStream = await ai.models.generateContentStream({
                     model: 'gemini-2.5-flash',
                     contents: [
+                        { role: 'user', parts: [{ text: CONFIG.SYSTEM_PROMPT }] },
                         ...history,
                         { role: 'user', parts: [{ text: lastMessage }] }
                     ]
@@ -266,15 +275,22 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                     model = 'openclaw-agent';
                 }
 
+                const defaultKey = provider === 'deepseek' ? CONFIG.DEFAULT_DEEPSEEK_KEY :
+                                   provider === 'moonshot' ? CONFIG.DEFAULT_MOONSHOT_KEY : '';
+                const apiKey = customApiKey || defaultKey;
+
                 const res = await fetch(`${url}/chat/completions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...(customApiKey ? { 'Authorization': `Bearer ${customApiKey}` } : {})
+                        ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
                     },
                     body: JSON.stringify({
                         model: model,
-                        messages: contextMessages,
+                        messages: [
+                            { role: 'system', content: CONFIG.SYSTEM_PROMPT },
+                            ...contextMessages
+                        ],
                         stream: true,
                         temperature: 0.7
                     })
