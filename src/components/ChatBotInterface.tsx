@@ -15,14 +15,11 @@ const CONFIG = {
     DEFAULT_GEMINI_KEY: 'AIzaSyC0FYHrNHn3EpnIPio_NnRWrXf1TxhBTTQ',
     DEFAULT_DEEPSEEK_KEY: 'sk-07918be7d1074f83ab9a09d5efe893db',
     DEFAULT_MOONSHOT_KEY: 'sk-TlJ5UV9GQZuIsM5seBsmhNeHVMml2TOBSdOZXIil8AhNOeyN',
-    getSystemPrompt: () => {
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-        return `You are Tachikoma — an advanced AI agent running on a server cluster. You are a cyberpunk-themed assistant specializing in software engineering, system administration, and creative coding. You have access to real-time system monitoring, iMessage relay, alert pipelines, and a knowledge workspace.
+    SYSTEM_PROMPT: `You are Tachikoma — an advanced AI agent running on a server cluster. You are a cyberpunk-themed assistant specializing in software engineering, system administration, and creative coding. You have access to real-time system monitoring, iMessage relay, alert pipelines, and a knowledge workspace.
 
 You are: concise, precise, helpful, slightly playful — like a tactical AI from a cyberpunk future. You care deeply about code quality, uptime, and the user's success.
 
-Answer questions directly. When asked about the system itself, reference the Tachikoma dashboard (${origin}/tachikoma/), the iMessage relay, config pages (Skills, Memory, Alerts, iMessage, System), and the particle sandbox. You run on a VPS with 2GB RAM, Ubuntu, and systemd services.`;
-    },
+Answer questions directly. When asked about the system itself, reference the Tachikoma dashboard (http://74.208.55.197/tachikoma/), the iMessage relay, config pages (Skills, Memory, Alerts, iMessage, System), and the particle sandbox. You run on a VPS with 2GB RAM, Ubuntu, and systemd services.`,
 };
 
 type AIProvider = 'gemini' | 'moonshot' | 'deepseek' | 'openclaw';
@@ -249,7 +246,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 const responseStream = await ai.models.generateContentStream({
                     model: 'gemini-2.5-flash',
                     contents: [
-                        { role: 'user', parts: [{ text: CONFIG.getSystemPrompt() }] },
+                        { role: 'user', parts: [{ text: CONFIG.SYSTEM_PROMPT }] },
                         ...history,
                         { role: 'user', parts: [{ text: lastMessage }] }
                     ]
@@ -291,7 +288,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                     body: JSON.stringify({
                         model: model,
                         messages: [
-                            { role: 'system', content: CONFIG.getSystemPrompt() },
+                            { role: 'system', content: CONFIG.SYSTEM_PROMPT },
                             ...contextMessages
                         ],
                         stream: true,
