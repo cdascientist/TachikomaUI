@@ -33,12 +33,12 @@ export const SkillsConfigPage: React.FC = () => {
   const hasWebSearch = tools?.web?.search?.enabled;
 
   return (
-    <ConfigPageShell title="Skills Config" description="Plugin registry, tool enablement, and skill runtime settings from OpenClaw" accentColor="cyan" loading={loading} error={error} onRetry={refetch}>
+    <ConfigPageShell title="Skills Configuration" description="Plugin registry, tool enablement, and skill runtime settings from OpenClaw" accentColor="cyan" loading={loading} error={error} onRetry={refetch}>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
         {/* Plugins */}
         <div className="flex items-center gap-2 mb-1">
           <Puzzle size={16} className="text-cyan-400" />
-          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Plugins</h3>
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Installed Plugins</h3>
         </div>
         <div className="space-y-2">
           {pluginKeys.map(key => (
@@ -69,7 +69,7 @@ export const SkillsConfigPage: React.FC = () => {
         {/* Tools */}
         <div className="flex items-center gap-2 mb-1">
           <Wrench size={16} className="text-cyan-400" />
-          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Tools</h3>
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Available Tools</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           {hasWebSearch && (

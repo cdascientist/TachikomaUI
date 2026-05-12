@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { TronVideoPlayer } from "./TronVideoPlayer";
 import { HolographicRoomScene } from "./HolographicRoomScene";
@@ -16,6 +16,7 @@ import { MemoryEditorPage } from "./MemoryEditorPage";
 import { AlertsConfigPage } from "./AlertsConfigPage";
 import { ImessageConfigPage } from "./ImessageConfigPage";
 import { SystemConfigPage } from "./SystemConfigPage";
+import { AgentConfigPage } from "./AgentConfigPage";
 import fullpage from "fullpage.js";
 import "fullpage.js/dist/fullpage.min.css";
 
@@ -96,6 +97,32 @@ export const ParallelDataOrchestrator: React.FC = () => {
   const [isSandboxMenuMinimized, setIsSandboxMenuMinimized] = useState<boolean>(false);
   const [isSandboxMenuHovered, setIsSandboxMenuHovered] = useState<boolean>(false);
   const [activeRoomIndex, setActiveRoomIndex] = useState<number>(0);
+
+  // Landing page info fades away after initial load
+  const [landingInfoOpacity, setLandingInfoOpacity] = useState<number>(1);
+  const landingFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isGlobalInitializationComplete) {
+      landingFadeTimer.current = setTimeout(() => {
+        setLandingInfoOpacity(0);
+      }, 6000);
+    }
+    const resetFade = () => {
+      setLandingInfoOpacity(1);
+      if (landingFadeTimer.current) clearTimeout(landingFadeTimer.current);
+      landingFadeTimer.current = setTimeout(() => setLandingInfoOpacity(0), 4000);
+    };
+    window.addEventListener('mousemove', resetFade, { once: false });
+    window.addEventListener('touchstart', resetFade, { once: false });
+    window.addEventListener('wheel', resetFade, { once: false });
+    return () => {
+      if (landingFadeTimer.current) clearTimeout(landingFadeTimer.current);
+      window.removeEventListener('mousemove', resetFade);
+      window.removeEventListener('touchstart', resetFade);
+      window.removeEventListener('wheel', resetFade);
+    };
+  }, [isGlobalInitializationComplete]);
 
   const orbPositions = orbsConfig.map(o => o.position);
   const wallPositions = wallsConfig.map(w => w.position);
@@ -710,8 +737,8 @@ export const ParallelDataOrchestrator: React.FC = () => {
             {/* ROOM 0: Cyberpunk Landing Overview */}
             <div className="section transparent-section relative">
               <InteractiveGesturePage />
-              <div className="absolute bottom-8 left-0 right-0 flex flex-col justify-end items-center p-4 md:p-8 select-none pointer-events-none z-10 w-full">
-                <div 
+              <div className="absolute bottom-8 left-0 right-0 flex flex-col justify-end items-center p-4 md:p-8 select-none pointer-events-none z-10 w-full" style={{ opacity: landingInfoOpacity, transition: 'opacity 2s ease-in-out' }}>
+                <div
                   className="cursor-pointer pointer-events-auto flex flex-col items-center hover:scale-105 transition-transform group"
                   onClick={() => (window as any).fullpage_api?.moveSectionDown()}
                 >
@@ -742,18 +769,48 @@ export const ParallelDataOrchestrator: React.FC = () => {
               <ChatBotInterface />
             </div>
 
-            {/* ROOM 2: Particle Sandbox */}
+            {/* ROOM 2: System Settings */}
+            <div className="section transparent-section">
+              <SystemConfigPage />
+            </div>
+
+            {/* ROOM 3: Agent Configuration */}
+            <div className="section transparent-section">
+              <AgentConfigPage />
+            </div>
+
+            {/* ROOM 4: iMessage Relay Configuration */}
+            <div className="section transparent-section">
+              <ImessageConfigPage />
+            </div>
+
+            {/* ROOM 5: Skills Configuration */}
+            <div className="section transparent-section">
+              <SkillsConfigPage />
+            </div>
+
+            {/* ROOM 6: Memory Editor */}
+            <div className="section transparent-section">
+              <MemoryEditorPage />
+            </div>
+
+            {/* ROOM 7: Alert System Configuration */}
+            <div className="section transparent-section">
+              <AlertsConfigPage />
+            </div>
+
+            {/* ROOM 8: Particle Sandbox */}
             <div className="section transparent-section">
               <div className="flex flex-col md:flex-row h-full w-full pointer-events-none">
                 {/* Editor Pane (Left Side) */}
-                <div 
+                <div
                   className={`pointer-events-auto flex flex-col h-full bg-black/80 md:bg-black/90 backdrop-blur-md border-r border-fuchsia-500/30 w-full md:w-[400px] lg:w-[450px] transition-transform duration-500 pt-20 pb-4 px-6 overflow-hidden shadow-[20px_0_50px_rgba(255,0,255,0.05)] ${isSandboxMenuMinimized ? '-translate-x-[calc(100%-60px)]' : 'translate-x-0'}`}
                 >
                   <div className="flex justify-between items-center mb-6 border-b border-fuchsia-500/20 pb-4 pt-12 md:pt-0 shrink-0">
                     <h2 className="text-xl sm:text-2xl font-mono text-fuchsia-400 drop-shadow-[0_0_10px_#f0f] tracking-widest uppercase">
                       Env Editor
                     </h2>
-                    <button 
+                    <button
                       onClick={() => setIsSandboxMenuMinimized(!isSandboxMenuMinimized)}
                       className="text-fuchsia-300 hover:text-white p-2 w-10 h-10 flex items-center justify-center border border-fuchsia-500/50 rounded-full bg-fuchsia-500/10 hover:bg-fuchsia-500/30 transition-colors font-mono text-xs shrink-0"
                       title={isSandboxMenuMinimized ? "Expand" : "Collapse"}
@@ -761,18 +818,18 @@ export const ParallelDataOrchestrator: React.FC = () => {
                       {isSandboxMenuMinimized ? '▶' : '◀'}
                     </button>
                   </div>
-                  
+
                   <div className={`flex flex-col flex-1 overflow-y-auto pr-2 custom-scrollbar transition-opacity duration-300 ${isSandboxMenuMinimized ? 'opacity-0' : 'opacity-100'}`}>
                     <p className="text-fuchsia-200/60 font-mono text-xs mb-6 uppercase tracking-widest border-l-2 border-fuchsia-500/50 pl-3">
                       Comprehensive Environment Construction. Modify Orbs, Planes, Walls, and Global Properties.
                     </p>
-                    
+
                     <div className="flex flex-col gap-6 pb-20">
                        <div className="flex flex-col gap-2 bg-fuchsia-900/10 p-4 rounded-xl border border-fuchsia-500/20">
                          <label className="text-fuchsia-300 font-mono text-xs uppercase tracking-wider mb-2 flex items-center gap-2">
                            <span className="w-2 h-2 bg-fuchsia-500 rounded-full"></span> Scene Graph
                          </label>
-                         <select 
+                         <select
                            className="bg-black/80 border border-fuchsia-400/50 text-fuchsia-300 p-3 rounded-lg font-mono text-sm focus:outline-none focus:border-fuchsia-400"
                            value={selectedElementId}
                            onChange={(e) => setSelectedElementId(e.target.value)}
@@ -878,7 +935,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
                            <input type="range" className="w-full h-2 bg-black rounded-lg appearance-none cursor-pointer border border-purple-500/30 accent-purple-500" min="0.5" max="5" step="0.1" value={sandboxWallScale} onChange={(e) => setSandboxWallScale(Number(e.target.value))} />
                          </div>
                        </div>
-                       
+
                        <button onClick={saveConfigToFile} className="mt-auto bg-fuchsia-600/20 hover:bg-fuchsia-500 w-full text-white border border-fuchsia-500/50 py-4 rounded-xl font-mono text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 mb-10 shadow-[0_0_15px_rgba(255,0,255,0.1)]">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                          Export JSON State
@@ -886,7 +943,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* 3D Viewport Area - Transparent */}
                 <div className="hidden md:flex flex-1 relative items-center justify-center pointer-events-none">
                   {/* Subtle Target overlay HUD */}
@@ -907,7 +964,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
               </div>
             </div>
 
-            {/* ROOM 3: Horizontal Video Flow */}
+            {/* ROOM 9: Horizontal Video Flow */}
             <div className="section transparent-section relative">
               {/* Custom Glowing Navigation Particles */}
               <button
@@ -974,32 +1031,7 @@ export const ParallelDataOrchestrator: React.FC = () => {
               </div>
             </div>
 
-            {/* ROOM 4: Skills Configuration */}
-            <div className="section transparent-section">
-              <SkillsConfigPage />
-            </div>
-
-            {/* ROOM 5: Memory Editor */}
-            <div className="section transparent-section">
-              <MemoryEditorPage />
-            </div>
-
-            {/* ROOM 6: Alert System Configuration */}
-            <div className="section transparent-section">
-              <AlertsConfigPage />
-            </div>
-
-            {/* ROOM 7: iMessage Relay Configuration */}
-            <div className="section transparent-section">
-              <ImessageConfigPage />
-            </div>
-
-            {/* ROOM 8: System Settings */}
-            <div className="section transparent-section">
-              <SystemConfigPage />
-            </div>
-
-            {/* ROOM 9: Payload Integration */}
+            {/* ROOM 10: Payload Integration */}
             <div className="section transparent-section fp-auto-height">
               <div className="flex flex-col h-full justify-center items-center p-4 md:p-8 select-none py-20 min-h-screen">
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-mono text-cyan-400 mb-6 drop-shadow-[0_0_15px_#0ff] pointer-events-auto break-words w-full text-center shrink-0">

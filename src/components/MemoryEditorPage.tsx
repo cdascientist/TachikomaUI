@@ -49,13 +49,13 @@ export const MemoryEditorPage: React.FC = () => {
   const fileList = files || [];
 
   return (
-    <ConfigPageShell title="Memory Editor" description="Workspace soul files — edit markdown memories, identity, and skill definitions" accentColor="fuchsia" loading={loading} error={error} onRetry={refetchFiles}>
+    <ConfigPageShell title="Memory Workspace" description="Workspace soul files — edit markdown memories, identity, and skill definitions" accentColor="fuchsia" loading={loading} error={error} onRetry={refetchFiles}>
       <div className="flex flex-col md:flex-row gap-4">
         {/* File List */}
         <motion.div className="w-full md:w-60 flex-shrink-0" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
           <div className="flex items-center gap-2 mb-2">
             <FileText size={15} className="text-fuchsia-400" />
-            <h3 className="text-xs font-mono text-gray-200 uppercase tracking-wider">Workspace Files</h3>
+            <h3 className="text-xs font-mono text-gray-200 uppercase tracking-wider">Workspace Memory Files</h3>
           </div>
           <div className="border border-fuchsia-500/20 rounded-xl bg-fuchsia-900/5 overflow-hidden">
             {fileList.map(f => (

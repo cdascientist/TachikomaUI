@@ -33,7 +33,7 @@ export const ConfigPageShell: React.FC<ConfigPageShellProps> = ({
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="flex justify-center items-center h-full p-4"
     >
-      <div className={`w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-3xl p-6 md:p-8 bg-gradient-to-b ${c.bg} backdrop-blur-xl border ${c.border} ${c.glow} pointer-events-auto custom-scrollbar`}>
+      <div className={`w-full max-w-3xl max-h-[80vh] min-h-[65vh] overflow-y-auto rounded-3xl p-6 md:p-8 bg-gradient-to-b ${c.bg} backdrop-blur-xl border ${c.border} ${c.glow} pointer-events-auto custom-scrollbar`}>
         <h2 className={`text-xl md:text-2xl font-mono ${c.text} drop-shadow-md uppercase tracking-widest mb-1`}>
           {title}
         </h2>

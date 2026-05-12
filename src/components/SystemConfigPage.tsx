@@ -53,12 +53,12 @@ export const SystemConfigPage: React.FC = () => {
   };
 
   return (
-    <ConfigPageShell title="System Config" description="Model providers, service health, resource utilization, and runtime settings" accentColor="purple" loading={loading} error={null} onRetry={handleRetry}>
+    <ConfigPageShell title="System Configuration" description="Model providers, service health, resource utilization, and runtime settings" accentColor="purple" loading={loading} error={null} onRetry={handleRetry}>
       <motion.div variants={containerAnim} initial="hidden" animate="show" className="space-y-4">
         {/* Model Providers (Accordions) */}
         <div className="flex items-center gap-2 mb-1">
           <Brain size={16} className="text-purple-400" />
-          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Model Providers</h3>
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Connected AI Providers</h3>
         </div>
         <div className="space-y-1.5">
           {Object.entries(providers).map(([key, provider]) => {
@@ -79,9 +79,9 @@ export const SystemConfigPage: React.FC = () => {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="font-mono text-[10px] text-purple-400 uppercase tracking-wider">
-                          <th className="p-1.5">Model ID</th>
-                          <th className="p-1.5">Context</th>
-                          <th className="p-1.5">Max Tokens</th>
+                          <th className="p-1.5">Model</th>
+                          <th className="p-1.5">Context Window</th>
+                          <th className="p-1.5">Max Output</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -109,7 +109,7 @@ export const SystemConfigPage: React.FC = () => {
         {/* Services */}
         <div className="flex items-center gap-2 mb-1">
           <Server size={16} className="text-purple-400" />
-          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Services</h3>
+          <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Running Services</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(servicesData).map(([key, svc]) => (
@@ -128,7 +128,7 @@ export const SystemConfigPage: React.FC = () => {
           <motion.div variants={rowItem} className="space-y-3">
             <div className="flex items-center gap-2 mt-2">
               <Cpu size={16} className="text-purple-400" />
-              <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Resources</h3>
+              <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">System Resources</h3>
             </div>
 
             {/* RAM */}

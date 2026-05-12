@@ -1,33 +1,37 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 const CONFIG = {
-    DEFAULT_ANTHROPIC_KEY: '',
-    DEFAULT_DEEPSEEK_KEY: 'sk-07918be7d1074f83ab9a09d5efe893db',
-    DEFAULT_MOONSHOT_KEY: 'sk-TlJ5UV9GQZuIsM5seBsmhNeHVMml2TOBSdOZXIil8AhNOeyN',
-    DEFAULT_GEMINI_KEY: 'AIzaSyC0FYHrNHn3EpnIPio_NnRWrXf1TxhBTTQ',
-    ANTHROPIC_VERSION: '2023-06-01',
     getSystemPrompt: () => {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-        return `You are Claude, an AI agent running on the Tachikoma server cluster at 74.208.55.197. You are a cyberpunk-themed tactical assistant specializing in software engineering, system administration, and creative coding. You have direct socket access to real-time system monitoring, iMessage relay via SendBlue, alert pipelines (VMQ+), and an OpenClaw knowledge workspace.
+        return `You are the Spin Up Agent, an AI running on the Tachikoma server cluster at 74.208.55.197. You are a cyberpunk-themed tactical assistant specializing in software engineering, system administration, and creative coding. You have direct socket access to real-time system monitoring, iMessage relay via SendBlue, alert pipelines (VMQ+), and an OpenClaw knowledge workspace.
 
 Personality: Concise, precise, helpful, slightly playful. You care about code quality, uptime, and the user's success. The Tachikoma dashboard is at ${origin}/tachikoma/.`;
     },
 };
 
-type AIProvider = 'claude' | 'gemini' | 'moonshot' | 'deepseek' | 'openclaw';
+type AgentId = 'claude' | 'gemini' | 'deepseek' | 'moonshot';
 
 export const TypingBotInterface: React.FC = React.memo(() => {
     const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
     const [inputText, setInputText] = useState("");
     const [streamingContent, setStreamingContent] = useState("");
 
     const [showSettings, setShowSettings] = useState(false);
-    const [provider, setProvider] = useState<AIProvider>('claude');
-    const [customApiKey, setCustomApiKey] = useState("");
+    const [agent, setAgent] = useState<AgentId>('claude');
+    const [apiKey, setApiKey] = useState(() => {
+        try { return localStorage.getItem('tachikoma-anthropic-key') || ''; } catch { return ''; }
+    });
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    const getWsUrl = () => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${window.location.host}/tachikoma/ws`;
+    };
 
     useEffect(() => {
         window.dispatchEvent(new CustomEvent('chatbot-speaking', { detail: isStreaming }));
@@ -39,187 +43,94 @@ export const TypingBotInterface: React.FC = React.memo(() => {
         }
     }, [messages, streamingContent]);
 
-    // Anthropic Claude API — direct socket to api.anthropic.com
-    const getClaudeResponse = async (contextMessages: { role: string, content: string }[]) => {
-        const apiKey = customApiKey || CONFIG.DEFAULT_ANTHROPIC_KEY;
-        if (!apiKey) throw new Error('Anthropic API key required. Click the gear icon to set one.');
+    // Send chat via WebSocket bridge to OpenClaw sub-agent
+    const sendViaWebSocket = (message: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const ws = new WebSocket(getWsUrl());
+            let fullText = '';
+            let resolved = false;
 
-        const messages = contextMessages.map(m => ({
-            role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-            content: m.content,
-        }));
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ type: 'chat', message, agent, apiKey }));
+            };
 
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': CONFIG.ANTHROPIC_VERSION,
-            },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
-                system: CONFIG.getSystemPrompt(),
-                messages,
-                stream: true,
-            }),
-        });
-
-        if (!res.ok) {
-            const errText = await res.text();
-            if (res.status === 401) throw new Error('Invalid Anthropic API key. Check your key in settings.');
-            throw new Error(`Anthropic HTTP ${res.status}: ${errText}`);
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response stream');
-        const decoder = new TextDecoder();
-        let fullText = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
+            ws.onmessage = (event) => {
+                if (resolved) return;
                 try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'content_block_delta') {
-                        const delta = parsed.delta?.text;
-                        if (delta) {
-                            fullText += delta;
-                            setStreamingContent(prev => prev + delta);
-                            window.dispatchEvent(new CustomEvent('chatbot-word'));
-                        }
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'delta' && msg.text) {
+                        fullText += msg.text;
+                        setStreamingContent(prev => prev + msg.text);
+                        window.dispatchEvent(new CustomEvent('chatbot-word'));
+                    } else if (msg.type === 'done') {
+                        resolved = true;
+                        ws.close();
+                        resolve(fullText);
+                    } else if (msg.type === 'error') {
+                        resolved = true;
+                        ws.close();
+                        reject(new Error(msg.text || 'Agent error'));
                     }
-                } catch (e) {}
-            }
-        }
-        return fullText;
-    };
-
-    const getOpenAICompatibleResponse = async (contextMessages: { role: string, content: string }[]) => {
-        let url: string;
-        let model: string;
-
-        if (provider === 'moonshot') {
-            url = 'https://api.moonshot.cn/v1';
-            model = 'moonshot-v1-8k';
-        } else if (provider === 'deepseek') {
-            url = 'https://api.deepseek.com/v1';
-            model = 'deepseek-chat';
-        } else if (provider === 'openclaw') {
-            url = 'http://74.208.55.197:8000/v1';
-            model = 'claude-sonnet-4-6';
-        } else {
-            throw new Error('Unknown provider');
-        }
-
-        const defaultKey = provider === 'deepseek' ? CONFIG.DEFAULT_DEEPSEEK_KEY :
-                           provider === 'moonshot' ? CONFIG.DEFAULT_MOONSHOT_KEY : '';
-        const apiKey = customApiKey || defaultKey;
-
-        const res = await fetch(`${url}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: CONFIG.getSystemPrompt() },
-                    ...contextMessages,
-                ],
-                stream: true,
-                temperature: 0.7,
-            }),
-        });
-
-        if (!res.ok) {
-            const errText = await res.text();
-            if (res.status === 401) throw new Error(`HTTP 401: Unauthorized. Provide a valid API key for ${provider}.`);
-            throw new Error(`HTTP ${res.status}: ${errText}`);
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response stream');
-        const decoder = new TextDecoder();
-        let fullText = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (!line.trim() || line === 'data: [DONE]') continue;
-                try {
-                    const data = JSON.parse(line.replace(/^data: /, ''));
-                    const delta = data.choices?.[0]?.delta?.content;
-                    if (delta) {
-                        fullText += delta;
-                        setStreamingContent(prev => prev + delta);
+                } catch (e) {
+                    const text = event.data?.toString()?.trim();
+                    if (text) {
+                        fullText += text;
+                        setStreamingContent(prev => prev + text);
                         window.dispatchEvent(new CustomEvent('chatbot-word'));
                     }
-                } catch (e) {}
-            }
-        }
-        return fullText;
-    };
-
-    const getAIResponse = async (contextMessages: any[]) => {
-        setIsStreaming(true);
-        setStreamingContent("");
-
-        try {
-            if (provider === 'claude') {
-                return await getClaudeResponse(contextMessages);
-            } else if (provider === 'gemini') {
-                const { GoogleGenAI } = await import('@google/genai');
-                const ai = new GoogleGenAI({ apiKey: customApiKey || CONFIG.DEFAULT_GEMINI_KEY });
-                const history = contextMessages.slice(0, -1).map((msg: any) => ({
-                    role: msg.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: msg.content }]
-                }));
-                const lastMessage = contextMessages[contextMessages.length - 1].content;
-                const responseStream = await ai.models.generateContentStream({
-                    model: 'gemini-2.5-flash',
-                    contents: [
-                        { role: 'user', parts: [{ text: CONFIG.getSystemPrompt() }] },
-                        ...history,
-                        { role: 'user', parts: [{ text: lastMessage }] }
-                    ]
-                });
-                let fullText = '';
-                for await (const chunk of responseStream) {
-                    const delta = chunk.text;
-                    if (delta) { fullText += delta; setStreamingContent(prev => prev + delta); window.dispatchEvent(new CustomEvent('chatbot-word')); }
                 }
-                return fullText;
-            } else {
-                return await getOpenAICompatibleResponse(contextMessages);
-            }
-        } catch (error: any) {
-            console.error('API Error:', error);
-            throw error;
-        } finally {
-            setIsStreaming(false);
-            setStreamingContent("");
-        }
+            };
+
+            ws.onerror = () => {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('WebSocket connection failed. Is the server running?'));
+                }
+            };
+
+            ws.onclose = () => {
+                if (!resolved) {
+                    resolved = true;
+                    if (fullText) resolve(fullText);
+                    else reject(new Error('Connection closed unexpectedly'));
+                }
+            };
+
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    ws.close();
+                    if (fullText) resolve(fullText);
+                    else reject(new Error('Request timed out'));
+                }
+            }, 120000);
+        });
     };
 
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || isProcessing) return;
         setIsProcessing(true);
         setInputText('');
+        setStreamingContent("");
+
+        // First interaction: show spin-up initialization
+        if (!hasInteracted) {
+            setHasInteracted(true);
+            setIsInitializing(true);
+            setIsStreaming(true);
+            setStreamingContent("Spinning Up Agent...");
+            await new Promise(r => setTimeout(r, 1200));
+            setIsInitializing(false);
+            setStreamingContent("");
+        }
+
+        setIsStreaming(true);
+
         const newMessages = [...messages, { role: 'user', content: text }];
         setMessages(newMessages);
+
         try {
-            const responseText = await getAIResponse(newMessages);
+            const responseText = await sendViaWebSocket(text);
             if (responseText) {
                 setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
             }
@@ -227,15 +138,16 @@ export const TypingBotInterface: React.FC = React.memo(() => {
             setMessages(prev => [...prev, { role: 'assistant', content: `[Error]: ${error.message}` }]);
         } finally {
             setIsProcessing(false);
+            setIsStreaming(false);
+            setStreamingContent("");
         }
     };
 
-    const providerLabels: Record<AIProvider, string> = {
-        claude: 'Claude (Anthropic)',
+    const agentLabels: Record<AgentId, string> = {
+        claude: 'Spin Up Agent',
         gemini: 'Gemini',
-        moonshot: 'Moonshot (Kimi)',
         deepseek: 'DeepSeek',
-        openclaw: 'OpenClaw Gateway',
+        moonshot: 'Moonshot (Kimi)',
     };
 
     return (
@@ -253,29 +165,34 @@ export const TypingBotInterface: React.FC = React.memo(() => {
                     {showSettings && (
                         <div className="bg-black/80 backdrop-blur-md border border-fuchsia-500/30 rounded-xl p-4 w-64 shadow-[0_0_20px_rgba(255,0,255,0.15)] flex flex-col gap-3">
                             <div>
-                                <label className="block text-fuchsia-400 text-xs font-mono mb-1">Provider</label>
+                                <label className="block text-fuchsia-400 text-xs font-mono mb-1">Sub-Agent</label>
                                 <select
-                                    value={provider}
-                                    onChange={(e) => setProvider(e.target.value as AIProvider)}
+                                    value={agent}
+                                    onChange={(e) => setAgent(e.target.value as AgentId)}
                                     className="w-full bg-fuchsia-900/20 border border-fuchsia-500/30 rounded px-2 py-1 text-sm text-fuchsia-50 focus:outline-none focus:border-fuchsia-400 font-mono"
                                 >
-                                    {Object.entries(providerLabels).map(([k, v]) => (
+                                    {Object.entries(agentLabels).map(([k, v]) => (
                                         <option key={k} value={k}>{v}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-fuchsia-400 text-xs font-mono mb-1">
-                                    API Key {provider === 'claude' && <span className="text-yellow-400">*</span>}
-                                </label>
+                                <label className="block text-fuchsia-400 text-xs font-mono mb-1">Anthropic API Key</label>
                                 <input
                                     type="password"
-                                    value={customApiKey}
-                                    onChange={(e) => setCustomApiKey(e.target.value)}
-                                    placeholder={provider === 'claude' ? "sk-ant-api03-..." : "Optional"}
+                                    value={apiKey}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setApiKey(v);
+                                        try { localStorage.setItem('tachikoma-anthropic-key', v); } catch {}
+                                    }}
+                                    placeholder="sk-ant-..."
                                     className="w-full bg-fuchsia-900/20 border border-fuchsia-500/30 rounded px-2 py-1 text-sm text-fuchsia-50 placeholder-fuchsia-500/40 focus:outline-none focus:border-fuchsia-400 font-mono"
                                 />
                             </div>
+                            <p className="text-fuchsia-500/50 text-[10px] font-mono leading-relaxed">
+                                Defaults to DeepSeek. Provide an Anthropic API key to switch to Claude direct stream.
+                            </p>
                         </div>
                     )}
                 </div>

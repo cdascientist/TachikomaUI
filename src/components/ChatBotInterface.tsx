@@ -1,29 +1,23 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 const CONFIG = {
-    ELEVENLABS_API_KEY: 'sk_65d9a9684d7a2b023abc71e3b9b6fbf612722803efa4bfae',
-    ELEVENLABS_VOICE_ID: '21m00Tcm4TlvDq8ikWAM',
-    ELEVENLABS_MODEL: 'eleven_multilingual_v2',
+    ELEVENLABS_VOICE_ID: 'scOwDtmlUjD3prqpp97I',
+    ELEVENLABS_MODEL: 'eleven_turbo_v2',
     TTS_MAX_CHARS: 3000,
     STT_LANGUAGE: 'en-US',
     AUTO_SEND_ON_RELEASE: true,
     SPEAK_ON_COMPLETE: true,
-    DEFAULT_ANTHROPIC_KEY: '',
-    DEFAULT_DEEPSEEK_KEY: 'sk-07918be7d1074f83ab9a09d5efe893db',
-    DEFAULT_MOONSHOT_KEY: 'sk-TlJ5UV9GQZuIsM5seBsmhNeHVMml2TOBSdOZXIil8AhNOeyN',
-    DEFAULT_GEMINI_KEY: 'AIzaSyC0FYHrNHn3EpnIPio_NnRWrXf1TxhBTTQ',
-    ANTHROPIC_VERSION: '2023-06-01',
     getSystemPrompt: () => {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-        return `You are Claude, an AI agent running on the Tachikoma server cluster at 74.208.55.197. You are a cyberpunk-themed tactical assistant specializing in software engineering, system administration, and creative coding. You have direct socket access to real-time system monitoring, iMessage relay via SendBlue, alert pipelines (VMQ+), and an OpenClaw knowledge workspace with 9 memory files.
+        return `You are the Spin Up Agent, an AI running on the Tachikoma server cluster at 74.208.55.197. You are a cyberpunk-themed tactical assistant specializing in software engineering, system administration, and creative coding. You have direct socket access to real-time system monitoring, iMessage relay via SendBlue, alert pipelines (VMQ+), and an OpenClaw knowledge workspace.
 
-Personality: Concise, precise, helpful, slightly playful — like a tactical AI from a cyberpunk future. You care about code quality, uptime, and the user's success.
+Personality: Concise, precise, helpful, slightly playful. You care about code quality, uptime, and the user's success.
 
-You run on Ubuntu with 2GB RAM, systemd services, the OpenClaw Gateway on port 8000, and the Tachikoma dashboard at ${origin}/tachikoma/. The dashboard has config pages for Skills, Memory, Alerts, iMessage, and System monitoring. Answer questions directly.`;
+You run on Ubuntu with 2GB RAM, systemd services, the OpenClaw Gateway on port 8000, and the Tachikoma dashboard at ${origin}/tachikoma/. Answer in a natural conversational voice.`;
     },
 };
 
-type AIProvider = 'claude' | 'gemini' | 'moonshot' | 'deepseek' | 'openclaw';
+type AgentId = 'claude' | 'gemini' | 'deepseek' | 'moonshot';
 
 export const ChatBotInterface: React.FC = React.memo(() => {
     const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
@@ -32,18 +26,32 @@ export const ChatBotInterface: React.FC = React.memo(() => {
     const [isStreaming, setIsStreaming] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [inputText, setInputText] = useState("");
-    const [statusText, setStatusText] = useState("Claude Agent // Ready");
+    const [statusText, setStatusText] = useState("Spin Up Agent // Standby");
     const [streamingContent, setStreamingContent] = useState("");
+    const [isInitializing, setIsInitializing] = useState(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
 
     const [showSettings, setShowSettings] = useState(false);
-    const [provider, setProvider] = useState<AIProvider>('claude');
-    const [customApiKey, setCustomApiKey] = useState("");
+    const [agent, setAgent] = useState<AgentId>('claude');
+    const [apiKey, setApiKey] = useState(() => {
+        try { return localStorage.getItem('tachikoma-anthropic-key') || ''; } catch { return ''; }
+    });
+    const [elevenLabsKey, setElevenLabsKey] = useState(() => {
+        try { return localStorage.getItem('tachikoma-elevenlabs-key') || ''; } catch { return ''; }
+    });
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const recognitionRef = useRef<any>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputTextRef = useRef(inputText);
     const isRecordingRef = useRef(isRecording);
+    const wsRef = useRef<WebSocket | null>(null);
+
+    // Compute WebSocket URL from current origin
+    const getWsUrl = () => {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${proto}//${window.location.host}/tachikoma/ws`;
+    };
 
     useEffect(() => { inputTextRef.current = inputText; }, [inputText]);
     useEffect(() => {
@@ -87,7 +95,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                     if (text && CONFIG.AUTO_SEND_ON_RELEASE) {
                         handleSendMessage(text);
                     } else {
-                        setStatusText('Claude Agent // Ready');
+                        setStatusText('Spin Up Agent // Standby');
                     }
                 }
             };
@@ -105,12 +113,13 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         setIsSpeaking(false);
         setIsStreaming(false);
         setStreamingContent("");
-        setStatusText('Claude Agent // Ready');
+        setStatusText('Spin Up Agent // Standby');
     }, []);
 
     const speakText = async (text: string) => {
         if (isSpeaking) stopSpeaking();
         if (text.length > CONFIG.TTS_MAX_CHARS) text = text.slice(0, CONFIG.TTS_MAX_CHARS);
+        const ttsKey = elevenLabsKey || 'sk_65d9a9684d7a2b023abc71e3b9b6fbf612722803efa4bfae';
         setIsSpeaking(true);
         setIsStreaming(true);
         setStreamingContent("");
@@ -121,7 +130,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 'https://api.elevenlabs.io/v1/text-to-speech/' + CONFIG.ELEVENLABS_VOICE_ID,
                 {
                     method: 'POST',
-                    headers: { 'xi-api-key': CONFIG.ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
+                    headers: { 'xi-api-key': ttsKey, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         text: text,
                         model_id: CONFIG.ELEVENLABS_MODEL,
@@ -129,7 +138,10 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                     }),
                 }
             );
-            if (!response.ok) { const errText = await response.text(); throw new Error('ElevenLabs error ' + response.status + ': ' + errText); }
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error((errData as any).error || 'ElevenLabs error ' + response.status);
+            }
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
@@ -144,7 +156,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 setIsStreaming(false);
                 setStreamingContent("");
                 setIsSpeaking(false);
-                setStatusText('Claude Agent // Ready');
+                setStatusText('Spin Up Agent // Standby');
                 audioRef.current = null;
             };
 
@@ -173,181 +185,80 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         }
     };
 
-    // Anthropic Claude API — direct socket to api.anthropic.com
-    const getClaudeResponse = async (contextMessages: { role: string, content: string }[]) => {
-        const apiKey = customApiKey || CONFIG.DEFAULT_ANTHROPIC_KEY;
-        if (!apiKey) throw new Error('Anthropic API key required. Click the gear icon to set one.');
+    // Send chat via WebSocket bridge to OpenClaw sub-agent
+    const sendViaWebSocket = (message: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const ws = new WebSocket(getWsUrl());
+            let fullText = '';
+            let resolved = false;
 
-        // Convert to Anthropic Messages format: user/assistant roles only
-        const messages = contextMessages.map(m => ({
-            role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-            content: m.content,
-        }));
+            const cleanup = () => {
+                if (!resolved) return;
+            };
 
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': CONFIG.ANTHROPIC_VERSION,
-            },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
-                system: CONFIG.getSystemPrompt(),
-                messages,
-                stream: true,
-            }),
-        });
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ type: 'chat', message, agent, apiKey }));
+            };
 
-        if (!res.ok) {
-            const errText = await res.text();
-            if (res.status === 401) throw new Error('Invalid Anthropic API key. Check your key in settings.');
-            throw new Error(`Anthropic HTTP ${res.status}: ${errText}`);
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response stream');
-        const decoder = new TextDecoder();
-        let fullText = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
+            ws.onmessage = (event) => {
+                if (resolved) return;
                 try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'content_block_delta') {
-                        const delta = parsed.delta?.text;
-                        if (delta) {
-                            fullText += delta;
-                            setStreamingContent(prev => prev + delta);
-                        }
-                    } else if (parsed.type === 'message_stop') {
-                        // stream complete
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'ready') {
+                        // Server acknowledged, wait for chat response
+                    } else if (msg.type === 'delta' && msg.text) {
+                        fullText += msg.text;
+                        setStreamingContent(prev => prev + msg.text);
+                    } else if (msg.type === 'done') {
+                        resolved = true;
+                        ws.close();
+                        resolve(fullText);
+                    } else if (msg.type === 'error') {
+                        resolved = true;
+                        ws.close();
+                        reject(new Error(msg.text || 'Agent error'));
                     }
-                } catch (e) {}
-            }
-        }
-        return fullText;
-    };
-
-    // OpenAI-compatible providers (DeepSeek, Moonshot, OpenClaw)
-    const getOpenAICompatibleResponse = async (contextMessages: { role: string, content: string }[]) => {
-        let url: string;
-        let model: string;
-
-        if (provider === 'moonshot') {
-            url = 'https://api.moonshot.cn/v1';
-            model = 'moonshot-v1-8k';
-        } else if (provider === 'deepseek') {
-            url = 'https://api.deepseek.com/v1';
-            model = 'deepseek-chat';
-        } else if (provider === 'openclaw') {
-            url = 'http://74.208.55.197:8000/v1';
-            model = 'claude-sonnet-4-6';
-        } else {
-            throw new Error('Unknown provider');
-        }
-
-        const defaultKey = provider === 'deepseek' ? CONFIG.DEFAULT_DEEPSEEK_KEY :
-                           provider === 'moonshot' ? CONFIG.DEFAULT_MOONSHOT_KEY : '';
-        const apiKey = customApiKey || defaultKey;
-
-        const res = await fetch(`${url}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: CONFIG.getSystemPrompt() },
-                    ...contextMessages,
-                ],
-                stream: true,
-                temperature: 0.7,
-            }),
-        });
-
-        if (!res.ok) {
-            const errText = await res.text();
-            if (res.status === 401) throw new Error(`HTTP 401: Unauthorized. Provide a valid API key for ${provider}.`);
-            throw new Error(`HTTP ${res.status}: ${errText}`);
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response stream');
-        const decoder = new TextDecoder();
-        let fullText = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (!line.trim() || line === 'data: [DONE]') continue;
-                try {
-                    const data = JSON.parse(line.replace(/^data: /, ''));
-                    const delta = data.choices?.[0]?.delta?.content;
-                    if (delta) {
-                        fullText += delta;
-                        setStreamingContent(prev => prev + delta);
+                } catch (e) {
+                    // Non-JSON response, treat as text delta
+                    const text = event.data?.toString()?.trim();
+                    if (text) {
+                        fullText += text;
+                        setStreamingContent(prev => prev + text);
                     }
-                } catch (e) {}
-            }
-        }
-        return fullText;
-    };
-
-    const getAIResponse = async (contextMessages: any[]) => {
-        setStatusText('Thinking...');
-        setIsStreaming(true);
-        setStreamingContent("");
-
-        try {
-            if (provider === 'claude') {
-                return await getClaudeResponse(contextMessages);
-            } else if (provider === 'gemini') {
-                const { GoogleGenAI } = await import('@google/genai');
-                const ai = new GoogleGenAI({ apiKey: customApiKey || CONFIG.DEFAULT_GEMINI_KEY });
-                const history = contextMessages.slice(0, -1).map((msg: any) => ({
-                    role: msg.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: msg.content }]
-                }));
-                const lastMessage = contextMessages[contextMessages.length - 1].content;
-                const responseStream = await ai.models.generateContentStream({
-                    model: 'gemini-2.5-flash',
-                    contents: [
-                        { role: 'user', parts: [{ text: CONFIG.getSystemPrompt() }] },
-                        ...history,
-                        { role: 'user', parts: [{ text: lastMessage }] }
-                    ]
-                });
-                let fullText = '';
-                for await (const chunk of responseStream) {
-                    const delta = chunk.text;
-                    if (delta) { fullText += delta; setStreamingContent(prev => prev + delta); }
                 }
-                return fullText;
-            } else {
-                return await getOpenAICompatibleResponse(contextMessages);
-            }
-        } catch (error: any) {
-            console.error('API Error:', error);
-            throw error;
-        } finally {
-            setIsStreaming(false);
-            setStreamingContent("");
-            setStatusText('Claude Agent // Ready');
-        }
+            };
+
+            ws.onerror = () => {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('WebSocket connection failed. Is the server running?'));
+                }
+            };
+
+            ws.onclose = () => {
+                if (!resolved) {
+                    resolved = true;
+                    if (fullText) {
+                        resolve(fullText);
+                    } else {
+                        reject(new Error('Connection closed unexpectedly'));
+                    }
+                }
+            };
+
+            // 120s timeout
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    ws.close();
+                    if (fullText) {
+                        resolve(fullText);
+                    } else {
+                        reject(new Error('Request timed out'));
+                    }
+                }
+            }, 120000);
+        });
     };
 
     const handleSendMessage = async (text: string) => {
@@ -355,18 +266,46 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         setIsProcessing(true);
         setInputText('');
         if (isSpeaking) stopSpeaking();
+        setStreamingContent("");
+
+        // First interaction: show spin-up initialization
+        if (!hasInteracted) {
+            setHasInteracted(true);
+            setIsInitializing(true);
+            setStatusText('Spinning Up Agent...');
+            setIsStreaming(true);
+            await new Promise(r => setTimeout(r, 1200));
+            setIsInitializing(false);
+        }
+
+        setStatusText('Processing...');
+        setIsStreaming(true);
+
         const newMessages = [...messages, { role: 'user', content: text }];
         setMessages(newMessages);
+
         try {
-            const responseText = await getAIResponse(newMessages);
+            const responseText = await sendViaWebSocket(text);
+            // Reset text-stream state before TTS takes over the streaming display
+            setIsStreaming(false);
+            setStreamingContent("");
             if (responseText) {
-                if (CONFIG.SPEAK_ON_COMPLETE) await speakText(responseText);
                 setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+                // speakText manages its own streaming/status lifecycle — don't clear it in finally
+                await speakText(responseText);
+            } else {
+                setMessages(prev => [...prev, { role: 'assistant', content: '[No response received]' }]);
             }
         } catch (error: any) {
             setMessages(prev => [...prev, { role: 'assistant', content: `[Error]: ${error.message}` }]);
         } finally {
             setIsProcessing(false);
+            // Only reset streaming if TTS isn't active (TTS cleanup handles its own state)
+            if (!audioRef.current) {
+                setIsStreaming(false);
+                setStreamingContent("");
+                setStatusText('Spin Up Agent // Standby');
+            }
         }
     };
 
@@ -394,12 +333,11 @@ export const ChatBotInterface: React.FC = React.memo(() => {
 
     const isBusy = isProcessing || isSpeaking;
 
-    const providerLabels: Record<AIProvider, string> = {
-        claude: 'Claude (Anthropic)',
+    const agentLabels: Record<AgentId, string> = {
+        claude: 'Spin Up Agent',
         gemini: 'Gemini',
-        moonshot: 'Moonshot (Kimi)',
         deepseek: 'DeepSeek',
-        openclaw: 'OpenClaw Gateway',
+        moonshot: 'Moonshot (Kimi)',
     };
 
     return (
@@ -415,31 +353,51 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 {showSettings && (
                     <div className="bg-black/60 backdrop-blur-md border border-fuchsia-500/30 rounded-xl p-4 w-64 shadow-[0_0_20px_rgba(255,0,255,0.15)] flex flex-col gap-3">
                         <div>
-                            <label className="block text-fuchsia-400 text-xs font-mono mb-1">Provider</label>
+                            <label className="block text-fuchsia-400 text-xs font-mono mb-1">Sub-Agent</label>
                             <select
-                                value={provider}
-                                onChange={(e) => setProvider(e.target.value as AIProvider)}
+                                value={agent}
+                                onChange={(e) => setAgent(e.target.value as AgentId)}
                                 className="w-full bg-fuchsia-900/20 border border-fuchsia-500/30 rounded px-2 py-1 text-sm text-fuchsia-50 focus:outline-none focus:border-fuchsia-400 font-mono"
                             >
-                                {Object.entries(providerLabels).map(([k, v]) => (
+                                {Object.entries(agentLabels).map(([k, v]) => (
                                     <option key={k} value={k}>{v}</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-fuchsia-400 text-xs font-mono mb-1">
-                                API Key {provider === 'claude' && <span className="text-yellow-400">*</span>}
-                            </label>
+                            <label className="block text-fuchsia-400 text-xs font-mono mb-1">Anthropic API Key</label>
                             <input
                                 type="password"
-                                value={customApiKey}
-                                onChange={(e) => setCustomApiKey(e.target.value)}
-                                placeholder={provider === 'claude'
-                                    ? "sk-ant-api03-..."
-                                    : provider === 'gemini' ? "Optional (uses default)" : "Optional"}
+                                value={apiKey}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setApiKey(v);
+                                    try { localStorage.setItem('tachikoma-anthropic-key', v); } catch {}
+                                }}
+                                placeholder="sk-ant-..."
                                 className="w-full bg-fuchsia-900/20 border border-fuchsia-500/30 rounded px-2 py-1 text-sm text-fuchsia-50 placeholder-fuchsia-500/40 focus:outline-none focus:border-fuchsia-400 font-mono"
                             />
                         </div>
+                        <p className="text-fuchsia-500/50 text-[10px] font-mono leading-relaxed">
+                            Defaults to DeepSeek. Provide an Anthropic API key to switch to Claude direct stream.
+                        </p>
+                        <div>
+                            <label className="block text-fuchsia-400 text-xs font-mono mb-1">ElevenLabs API Key</label>
+                            <input
+                                type="password"
+                                value={elevenLabsKey}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setElevenLabsKey(v);
+                                    try { localStorage.setItem('tachikoma-elevenlabs-key', v); } catch {}
+                                }}
+                                placeholder="sk_..."
+                                className="w-full bg-fuchsia-900/20 border border-fuchsia-500/30 rounded px-2 py-1 text-sm text-fuchsia-50 placeholder-fuchsia-500/40 focus:outline-none focus:border-fuchsia-400 font-mono"
+                            />
+                        </div>
+                        <p className="text-fuchsia-500/50 text-[10px] font-mono leading-relaxed">
+                            Voice uses ElevenLabs TTS. Leave blank to use the server default key.
+                        </p>
                     </div>
                 )}
             </div>
@@ -469,14 +427,26 @@ export const ChatBotInterface: React.FC = React.memo(() => {
             {/* Voice Control Interface */}
             <div className="w-full flex justify-center items-center gap-6 max-w-3xl">
                 <div className="flex flex-col items-center flex-grow">
-                    <p className={`text-lg md:text-xl font-mono transition-opacity duration-300 text-center mb-6 drop-shadow-md ${isRecording ? 'text-red-400 opacity-100 animate-pulse' : 'text-fuchsia-400 opacity-80'}`}>
+                    <p className={`text-lg md:text-xl font-mono transition-all duration-500 text-center mb-6 drop-shadow-md ${
+                        isRecording ? 'text-red-400 opacity-100 animate-pulse' :
+                        isInitializing ? 'text-cyan-400 opacity-100 animate-pulse' :
+                        isSpeaking ? 'text-fuchsia-300 opacity-100' :
+                        isProcessing ? 'text-fuchsia-400 opacity-100' :
+                        'text-fuchsia-400 opacity-70'
+                    }`}>
                         {statusText}
                     </p>
 
                     <div className="flex flex-col items-center w-full gap-4 relative">
                         {/* Hold-To-Speak Orb */}
                         <div
-                            className={`w-28 h-28 md:w-32 md:h-32 flex-shrink-0 cursor-pointer relative rounded-full overflow-hidden transition-all duration-300 border-2 flex items-center justify-center ${isRecording ? 'scale-90 shadow-[0_0_80px_rgba(255,0,0,0.8)] border-red-500 bg-red-500/20' : 'hover:scale-110 shadow-[0_0_60px_rgba(255,0,255,0.4)] border-fuchsia-500/80 bg-fuchsia-900/40'} ${isBusy ? 'opacity-50 pointer-events-none shadow-[0_0_40px_rgba(255,0,255,0.4)] border-fuchsia-500' : ''}`}
+                            className={`w-28 h-28 md:w-32 md:h-32 flex-shrink-0 cursor-pointer relative rounded-full overflow-hidden transition-all duration-500 border-2 flex items-center justify-center ${
+                                isRecording ? 'scale-90 shadow-[0_0_100px_rgba(255,0,0,0.9)] border-red-500 bg-red-500/30 animate-pulse' :
+                                isInitializing ? 'scale-95 shadow-[0_0_100px_rgba(0,255,255,0.9)] border-cyan-400 bg-cyan-500/20' :
+                                isSpeaking ? 'scale-105 shadow-[0_0_100px_rgba(255,0,255,0.9)] border-fuchsia-300 bg-fuchsia-500/30 animate-pulse' :
+                                isProcessing ? 'scale-100 shadow-[0_0_80px_rgba(255,0,255,0.7)] border-fuchsia-400 bg-fuchsia-500/20' :
+                                'hover:scale-110 shadow-[0_0_50px_rgba(255,0,255,0.35)] border-fuchsia-500/80 bg-fuchsia-900/40'
+                            }`}
                             onMouseDown={(e) => { e.preventDefault(); startRecording(); }}
                             onMouseUp={(e) => { e.preventDefault(); stopRecording(); }}
                             onMouseLeave={(e) => { if (isRecording) stopRecording(); }}
@@ -484,15 +454,27 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                             onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
                             onContextMenu={(e) => e.preventDefault()}
                         >
-                            {!isBusy ? (
-                                <svg className={`w-12 h-12 md:w-16 md:h-16 transition-colors ${isRecording ? 'text-red-400' : 'text-fuchsia-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                            ) : (
+                            {isRecording ? (
+                                <svg className="w-12 h-12 md:w-16 md:h-16 text-red-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                            ) : isInitializing ? (
+                                <svg className="w-12 h-12 md:w-16 md:h-16 text-cyan-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            ) : isSpeaking ? (
+                                <svg className="w-12 h-12 md:w-16 md:h-16 text-fuchsia-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.414a5 5 0 010-7.072m12.728 0a9 9 0 010 12.728M12 3v18"></path></svg>
+                            ) : isProcessing ? (
                                 <svg className="w-12 h-12 md:w-16 md:h-16 text-fuchsia-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            ) : (
+                                <svg className="w-12 h-12 md:w-16 md:h-16 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
                             )}
                         </div>
 
-                        <p className="text-xs text-fuchsia-500/60 font-mono tracking-widest mt-2">
-                            {isBusy ? "PROCESSING..." : "HOLD TO SPEAK"}
+                        <p className={`text-xs font-mono tracking-widest mt-2 transition-all duration-500 ${
+                            isRecording ? 'text-red-400 animate-pulse' :
+                            isInitializing ? 'text-cyan-400' :
+                            isSpeaking ? 'text-fuchsia-300' :
+                            isProcessing ? 'text-fuchsia-400' :
+                            'text-fuchsia-500/60'
+                        }`}>
+                            {isInitializing ? "SPINNING UP..." : isRecording ? "RECORDING..." : isProcessing ? "PROCESSING..." : isSpeaking ? "SPEAKING..." : "HOLD TO SPEAK"}
                         </p>
 
                         {/* Text input fallback */}

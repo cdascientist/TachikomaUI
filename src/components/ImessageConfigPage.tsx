@@ -35,10 +35,10 @@ export const ImessageConfigPage: React.FC = () => {
   const logEntries = log || [];
 
   const statCards = [
-    { label: "Total (7d)", value: s.total, icon: <MessageCircle size={18} />, color: "cyan" },
+    { label: "Total Messages", value: s.total, icon: <MessageCircle size={18} />, color: "cyan" },
     { label: "Responded", value: s.responded, icon: <CheckCircle size={18} />, color: "green" },
-    { label: "Pending", value: s.pending, icon: <Clock size={18} />, color: "yellow" },
-    { label: "Failed", value: s.failed, icon: <AlertTriangle size={18} />, color: "red" },
+    { label: "Pending Delivery", value: s.pending, icon: <Clock size={18} />, color: "yellow" },
+    { label: "Delivery Failed", value: s.failed, icon: <AlertTriangle size={18} />, color: "red" },
   ];
 
   const colorClasses: Record<string, { card: string; text: string }> = {
@@ -49,7 +49,7 @@ export const ImessageConfigPage: React.FC = () => {
   };
 
   return (
-    <ConfigPageShell title="iMessage Config" description="SendBlue relay status, message log, delivery stats, and force-respond controls" accentColor="green" loading={statsLoading && logLoading} error={null} onRetry={() => { refetchStats(); refetchLog(); }}>
+    <ConfigPageShell title="iMessage Relay" description="SendBlue relay status, message log, delivery stats, and force-respond controls" accentColor="green" loading={statsLoading && logLoading} error={null} onRetry={() => { refetchStats(); refetchLog(); }}>
       <motion.div variants={containerAnim} initial="hidden" animate="show" className="space-y-4">
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -72,7 +72,7 @@ export const ImessageConfigPage: React.FC = () => {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Send size={16} className="text-green-400" />
-            <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Message Log</h3>
+            <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Recent Messages</h3>
           </div>
           <button
             onClick={handleForce}
@@ -88,9 +88,9 @@ export const ImessageConfigPage: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-green-900/10 sticky top-0">
               <tr className="font-mono text-[10px] text-green-400 uppercase tracking-wider">
-                <th className="p-2">From</th>
-                <th className="p-2 max-w-[180px]">Content</th>
-                <th className="p-2">Dir</th>
+                <th className="p-2">Sender</th>
+                <th className="p-2 max-w-[180px]">Message</th>
+                <th className="p-2">Direction</th>
                 <th className="p-2">Status</th>
                 <th className="p-2 hidden md:table-cell">Time</th>
               </tr>
