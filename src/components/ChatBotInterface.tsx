@@ -40,30 +40,22 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         try { return localStorage.getItem('tachikoma-elevenlabs-key') || ''; } catch { return ''; }
     });
 
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const audioUnlockedRef = useRef(false);
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
     const recognitionRef = useRef<any>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputTextRef = useRef(inputText);
     const isRecordingRef = useRef(isRecording);
+    const wordTimerRef = useRef<any>(null);
 
-    // Unlock audio on first user gesture so browser permits playback after async TTS fetch
+    // Unlock AudioContext on first user gesture — browser allows it to play later
     const unlockAudio = () => {
-        if (audioUnlockedRef.current) return;
-        audioUnlockedRef.current = true;
+        if (audioCtxRef.current) return;
         try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const buf = ctx.createBuffer(1, 1, 22050);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(ctx.destination);
-            src.start(0);
             ctx.resume();
+            audioCtxRef.current = ctx;
         } catch {}
-        // Also prime the HTMLAudioElement path
-        const sil = new Audio();
-        sil.volume = 0;
-        sil.play().then(() => { sil.pause(); sil.remove(); }).catch(() => {});
     };
     const wsRef = useRef<WebSocket | null>(null);
 
@@ -129,7 +121,8 @@ export const ChatBotInterface: React.FC = React.memo(() => {
     }, []);
 
     const stopSpeaking = useCallback(() => {
-        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        if (audioSourceRef.current) { try { audioSourceRef.current.stop(); } catch {} audioSourceRef.current = null; }
+        if (wordTimerRef.current) { clearInterval(wordTimerRef.current); wordTimerRef.current = null; }
         setIsSpeaking(false);
         setIsStreaming(false);
         setStreamingContent("");
@@ -144,6 +137,14 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         setIsStreaming(true);
         setStreamingContent("");
         setStatusText('Speaking...');
+
+        const ctx = audioCtxRef.current;
+        if (!ctx) {
+            setIsSpeaking(false);
+            setIsStreaming(false);
+            setStatusText('TTS Error: Audio not unlocked — tap the mic button first');
+            return;
+        }
 
         try {
             const response = await fetch(
@@ -162,42 +163,45 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                 const errData = await response.json().catch(() => ({}));
                 throw new Error((errData as any).error || 'ElevenLabs error ' + response.status);
             }
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audioRef.current = audio;
+            const arrayBuf = await response.arrayBuffer();
+            const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(ctx.destination);
+            audioSourceRef.current = source;
 
             const words = text.split(' ');
             const totalWords = words.length;
-            let wordTimer: any;
+            const duration = audioBuffer.duration || (totalWords * 0.3);
 
             const cleanup = () => {
-                if (wordTimer) clearInterval(wordTimer);
+                if (wordTimerRef.current) { clearInterval(wordTimerRef.current); wordTimerRef.current = null; }
                 setIsStreaming(false);
                 setStreamingContent("");
                 setIsSpeaking(false);
                 setStatusText('Spin Up Agent // Standby');
-                audioRef.current = null;
+                audioSourceRef.current = null;
             };
 
-            audio.onplay = () => {
-                const duration = audio.duration || (totalWords * 0.3);
-                const interval = (duration / totalWords) * 1000;
-                let wordIndex = 0;
-                wordTimer = setInterval(() => {
-                    if (wordIndex < totalWords) {
-                        wordIndex++;
-                        setStreamingContent(words.slice(0, wordIndex).join(' '));
-                    } else {
-                        clearInterval(wordTimer);
-                    }
-                }, Math.max(interval, 50));
-            };
-            audio.onended = cleanup;
-            audio.onerror = cleanup;
-            await audio.play();
+            // Word-by-word display
+            const interval = (duration / totalWords) * 1000;
+            let wordIndex = 0;
+            wordTimerRef.current = setInterval(() => {
+                if (wordIndex < totalWords) {
+                    wordIndex++;
+                    setStreamingContent(words.slice(0, wordIndex).join(' '));
+                } else {
+                    clearInterval(wordTimerRef.current);
+                    wordTimerRef.current = null;
+                }
+            }, Math.max(interval, 50));
+
+            source.onended = cleanup;
+            source.start(0);
         } catch (error: any) {
             console.error('ElevenLabs TTS error:', error);
+            if (wordTimerRef.current) { clearInterval(wordTimerRef.current); wordTimerRef.current = null; }
             setIsStreaming(false);
             setStreamingContent("");
             setIsSpeaking(false);
@@ -322,7 +326,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
         } finally {
             setIsProcessing(false);
             // Only reset streaming if TTS isn't active (TTS cleanup handles its own state)
-            if (!audioRef.current) {
+            if (!audioSourceRef.current) {
                 setIsStreaming(false);
                 setStreamingContent("");
                 setStatusText('Spin Up Agent // Standby');
