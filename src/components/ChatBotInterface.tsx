@@ -41,10 +41,30 @@ export const ChatBotInterface: React.FC = React.memo(() => {
     });
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const audioUnlockedRef = useRef(false);
     const recognitionRef = useRef<any>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputTextRef = useRef(inputText);
     const isRecordingRef = useRef(isRecording);
+
+    // Unlock audio on first user gesture so browser permits playback after async TTS fetch
+    const unlockAudio = () => {
+        if (audioUnlockedRef.current) return;
+        audioUnlockedRef.current = true;
+        try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const buf = ctx.createBuffer(1, 1, 22050);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+            ctx.resume();
+        } catch {}
+        // Also prime the HTMLAudioElement path
+        const sil = new Audio();
+        sil.volume = 0;
+        sil.play().then(() => { sil.pause(); sil.remove(); }).catch(() => {});
+    };
     const wsRef = useRef<WebSocket | null>(null);
 
     // Compute WebSocket URL from current origin
@@ -263,6 +283,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
 
     const handleSendMessage = async (text: string) => {
         if (!text.trim() || isProcessing) return;
+        unlockAudio();
         setIsProcessing(true);
         setInputText('');
         if (isSpeaking) stopSpeaking();
@@ -447,10 +468,10 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                                 isProcessing ? 'scale-100 shadow-[0_0_80px_rgba(255,0,255,0.7)] border-fuchsia-400 bg-fuchsia-500/20' :
                                 'hover:scale-110 shadow-[0_0_50px_rgba(255,0,255,0.35)] border-fuchsia-500/80 bg-fuchsia-900/40'
                             }`}
-                            onMouseDown={(e) => { e.preventDefault(); startRecording(); }}
+                            onMouseDown={(e) => { e.preventDefault(); unlockAudio(); startRecording(); }}
                             onMouseUp={(e) => { e.preventDefault(); stopRecording(); }}
                             onMouseLeave={(e) => { if (isRecording) stopRecording(); }}
-                            onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+                            onTouchStart={(e) => { e.preventDefault(); unlockAudio(); startRecording(); }}
                             onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
                             onContextMenu={(e) => e.preventDefault()}
                         >
@@ -485,7 +506,7 @@ export const ChatBotInterface: React.FC = React.memo(() => {
                                 placeholder="Or type your message here..."
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                                onFocus={() => { if (isSpeaking) stopSpeaking(); }}
+                                onFocus={() => { unlockAudio(); if (isSpeaking) stopSpeaking(); }}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
