@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
@@ -16,25 +16,50 @@ interface AgentFeature {
   icon: React.ReactNode;
 }
 
+const defaultFeatures: Record<string, boolean> = {
+  workspace_memory: false,
+  plugin_skills: false,
+  tts_voice: true,
+  imessage_relay: false,
+  alert_pipeline: false,
+  auto_start: false,
+  keep_alive: false,
+};
+
 export const AgentConfigPage: React.FC = () => {
   const { data: config, loading, error, refetch } = useApi<any>("/api/openclaw/config");
   const [saving, setSaving] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
 
-  // All features default to disabled — user enables manually
+  // Features merge: server config > localStorage > hardcoded defaults
   const [features, setFeatures] = useState<Record<string, boolean>>(() => {
+    const stored: Record<string, boolean> = { ...defaultFeatures };
     try {
-      const saved = localStorage.getItem("agent-features");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+      const local = localStorage.getItem("agent-features");
+      if (local) Object.assign(stored, JSON.parse(local));
+    } catch {}
+    return stored;
   });
 
-  const persist = (key: string, value: boolean) => {
+  // When server config loads, merge it in (server takes priority over localStorage)
+  useEffect(() => {
+    if (config?.tachikoma?.agentFeatures) {
+      setFeatures(prev => ({ ...prev, ...config.tachikoma.agentFeatures }));
+    }
+  }, [config]);
+
+  const persist = async (key: string, value: boolean) => {
     const next = { ...features, [key]: value };
     setFeatures(next);
     try { localStorage.setItem("agent-features", JSON.stringify(next)); } catch {}
+    // Also persist to server immediately
+    try {
+      await fetch(apiUrl("/api/openclaw/config"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tachikoma: { agentFeatures: { [key]: value } } }),
+      });
+    } catch {}
   };
 
   const featureList: AgentFeature[] = [
@@ -95,9 +120,10 @@ export const AgentConfigPage: React.FC = () => {
       await fetch(apiUrl("/api/openclaw/config"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent: { features } }),
+        body: JSON.stringify({ tachikoma: { agentFeatures: features } }),
       });
-      setStatusMsg("Agent configuration saved");
+      try { localStorage.setItem("agent-features", JSON.stringify(features)); } catch {}
+      setStatusMsg("Agent configuration saved to server");
       setTimeout(() => setStatusMsg(""), 3000);
     } finally {
       setSaving(null);
@@ -111,7 +137,7 @@ export const AgentConfigPage: React.FC = () => {
     <ConfigPageShell title="Agent Configuration" description="Spin Up Agent customization — memory, skills, voice, relay, and automation. All features deactivated by default." accentColor="fuchsia" loading={loading} error={error} onRetry={refetch}>
       <motion.div variants={containerAnim} initial="hidden" animate="show" className="space-y-4">
 
-        {/* Agent Identity */}
+        {/* Agent Identity — dynamically shows model/provider info from config */}
         <motion.div variants={rowItem} className="flex items-center gap-3 p-4 rounded-xl border border-fuchsia-500/20 bg-fuchsia-900/5">
           <Brain size={20} className="text-fuchsia-400" />
           <div>
@@ -124,7 +150,7 @@ export const AgentConfigPage: React.FC = () => {
 
         <hr className="border-fuchsia-500/15 my-2" />
 
-        {/* Feature Toggles */}
+        {/* Feature Toggles — dynamically generated from real config state */}
         <div className="flex items-center gap-2 mb-1">
           <Settings size={16} className="text-fuchsia-400" />
           <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Agent Features</h3>
@@ -162,7 +188,7 @@ export const AgentConfigPage: React.FC = () => {
           </button>
         </motion.div>
 
-        {/* Provider Summary */}
+        {/* Provider Summary — dynamically shows providers from config */}
         {providerCount > 0 && (
           <>
             <hr className="border-fuchsia-500/15 my-2" />
