@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { ConfigPageShell } from "./ConfigPageShell";
 import { useApi } from "../hooks/useApi";
 import { apiUrl } from "../hooks/apiConfig";
-import { MessageCircle, CheckCircle, Clock, AlertTriangle, Zap, Send } from "lucide-react";
+import { MessageCircle, CheckCircle, Clock, AlertTriangle, Zap, Send, RotateCw, RefreshCw } from "lucide-react";
 
 const containerAnim = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const rowItem = { hidden: { opacity: 0, x: -10 }, show: { opacity: 1, x: 0 } };
@@ -17,6 +17,10 @@ export const ImessageConfigPage: React.FC = () => {
   const [forcing, setForcing] = useState(false);
   const [forceMsg, setForceMsg] = useState("");
 
+  const [retrying, setRetrying] = useState(false);
+  const [retryResult, setRetryResult] = useState<{ retried: number; injected: string[]; errors: string[] } | null>(null);
+  const [injecting, setInjecting] = useState<string | null>(null);
+
   const handleForce = async () => {
     setForcing(true);
     try {
@@ -28,6 +32,40 @@ export const ImessageConfigPage: React.FC = () => {
       refetchLog();
     } finally {
       setForcing(false);
+    }
+  };
+
+  const handleRetryStuck = async () => {
+    setRetrying(true);
+    setRetryResult(null);
+    try {
+      const res = await fetch(apiUrl("/api/imessage/retry-stuck"), { method: "POST" });
+      const d = await res.json();
+      setRetryResult(d);
+      refetchStats();
+      refetchLog();
+      setTimeout(() => setRetryResult(null), 8000);
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const handleInject = async (id: string) => {
+    setInjecting(id);
+    try {
+      const res = await fetch(apiUrl(`/api/imessage/inject/${id}`), { method: "POST" });
+      const d = await res.json();
+      if (d.success) {
+        setForceMsg(`Message #${id} re-injected`);
+        setTimeout(() => setForceMsg(""), 3000);
+      } else {
+        setForceMsg(`Inject failed: ${d.error}`);
+        setTimeout(() => setForceMsg(""), 4000);
+      }
+      refetchStats();
+      refetchLog();
+    } finally {
+      setInjecting(null);
     }
   };
 
@@ -74,13 +112,22 @@ export const ImessageConfigPage: React.FC = () => {
             <Send size={16} className="text-green-400" />
             <h3 className="text-sm font-mono text-gray-200 uppercase tracking-wider">Recent Messages</h3>
           </div>
-          <button
-            onClick={handleForce}
-            disabled={forcing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/40 rounded-lg text-yellow-300 font-mono text-xs uppercase tracking-wider transition-colors"
-          >
-            <Zap size={12} /> {forcing ? "Forcing..." : "Force All"}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleForce}
+              disabled={forcing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/40 rounded-lg text-yellow-300 font-mono text-xs uppercase tracking-wider transition-colors"
+            >
+              <Zap size={12} /> {forcing ? "Forcing..." : "Force All"}
+            </button>
+            <button
+              onClick={handleRetryStuck}
+              disabled={retrying}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 rounded-lg text-red-300 font-mono text-xs uppercase tracking-wider transition-colors"
+            >
+              <RotateCw size={12} className={retrying ? "animate-spin" : ""} /> {retrying ? "Retrying..." : "Retry Stuck"}
+            </button>
+          </div>
         </div>
 
         {/* Log Table */}
@@ -93,6 +140,7 @@ export const ImessageConfigPage: React.FC = () => {
                 <th className="p-2">Direction</th>
                 <th className="p-2">Status</th>
                 <th className="p-2 hidden md:table-cell">Time</th>
+                <th className="p-2 w-16">Act</th>
               </tr>
             </thead>
             <tbody>
@@ -113,10 +161,21 @@ export const ImessageConfigPage: React.FC = () => {
                   <td className="p-2 text-[10px] font-mono text-gray-500 hidden md:table-cell">
                     {entry.created_at ? new Date(entry.created_at).toLocaleString() : "—"}
                   </td>
+                  <td className="p-2">
+                    {entry.direction === "outbound" && (entry.status === "pending" || entry.status === "failed") && (
+                      <button
+                        onClick={() => handleInject(entry.id)}
+                        disabled={injecting === entry.id}
+                        className="flex items-center gap-1 px-1.5 py-0.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 rounded text-[9px] font-mono text-red-300 uppercase transition-colors"
+                      >
+                        <RefreshCw size={10} className={injecting === entry.id ? "animate-spin" : ""} />
+                      </button>
+                    )}
+                  </td>
                 </motion.tr>
               ))}
               {logEntries.length === 0 && (
-                <tr><td colSpan={5} className="p-4 text-center text-gray-500 font-mono text-sm">No messages in log</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-gray-500 font-mono text-sm">No messages in log</td></tr>
               )}
             </tbody>
           </table>
@@ -127,6 +186,16 @@ export const ImessageConfigPage: React.FC = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-900/80 border border-green-500/40 text-green-300 font-mono text-sm px-4 py-2 rounded-xl backdrop-blur-lg z-50">
           {forceMsg}
+        </motion.div>
+      )}
+
+      {retryResult && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-red-500/40 text-gray-200 font-mono text-xs px-4 py-3 rounded-xl backdrop-blur-lg z-50 max-w-md">
+          <div className="text-red-400 mb-1">Retry Results: {retryResult.retried} re-injected</div>
+          {retryResult.injected.map((s, i) => <div key={i} className="text-green-400">OK: {s}</div>)}
+          {retryResult.errors.map((s, i) => <div key={i} className="text-yellow-400">ERR: {s}</div>)}
+          {retryResult.retried === 0 && <div className="text-gray-500">No stuck messages found</div>}
         </motion.div>
       )}
     </ConfigPageShell>

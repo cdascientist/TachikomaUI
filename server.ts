@@ -519,6 +519,125 @@ async function startServer() {
     }
   });
 
+  // ========== IMESSAGE STUCK MESSAGE AUTO-RETRY ==========
+
+  const SENDBLUE_KEY = "b53cfba51f2d0919263f492d046e7cd8";
+  const SENDBLUE_SECRET = "f0f6f9b8a9a97731be9724deadf0888c";
+  const SEND_FROM_NUMBER = "+17862847802";
+  const STUCK_THRESHOLD_MIN = 10;
+
+  async function retryStuckMessages(): Promise<{ retried: number; injected: string[]; errors: string[] }> {
+    const injected: string[] = [];
+    const errors: string[] = [];
+    try {
+      // Find outbound messages stuck in pending for > threshold
+      const query = `SELECT id, to_number, content, attempts FROM tachikoma_alerts.imessage_log WHERE is_inbound = 0 AND status = 'pending' AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) > ${STUCK_THRESHOLD_MIN} AND attempts < 5 ORDER BY created_at ASC LIMIT 10`;
+      const out = execSync(`mysql -N -B -e "${query.replace(/"/g, '\\"')}"`, { encoding: "utf-8", timeout: 5000 });
+      const rows = out.trim().split("\n").filter(Boolean);
+      if (rows.length === 0) return { retried: 0, injected: [], errors: [] };
+
+      for (const row of rows) {
+        const [id, toNumber, content, attempts] = row.split("\t");
+        const shortPreview = (content || "").slice(0, 60);
+        try {
+          // Re-send directly via SendBlue API
+          const resp = await fetch("https://api.sendblue.co/api/send-message", {
+            method: "POST",
+            headers: {
+              "sb-api-key-id": SENDBLUE_KEY,
+              "sb-api-secret-key": SENDBLUE_SECRET,
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify({
+              from_number: SEND_FROM_NUMBER,
+              number: toNumber,
+              content: content,
+              send_style: "sequential",
+            }),
+          });
+          const data = await resp.json();
+          if (resp.ok && data.status !== "error" && data.status !== "failed") {
+            // Successfully re-injected — mark original as resolved
+            execSync(
+              `mysql -e "UPDATE tachikoma_alerts.imessage_log SET status = 'responded', date_responded = NOW(), attempts = ${parseInt(attempts || "0") + 1} WHERE id = ${id}"`,
+              { encoding: "utf-8", timeout: 3000 }
+            );
+            injected.push(`#${id}: ${shortPreview} → ${toNumber}`);
+          } else {
+            // Failed — increment attempts
+            const newAttempts = parseInt(attempts || "0") + 1;
+            const newStatus = newAttempts >= 5 ? "failed" : "pending";
+            execSync(
+              `mysql -e "UPDATE tachikoma_alerts.imessage_log SET attempts = ${newAttempts}, status = '${newStatus}' WHERE id = ${id}"`,
+              { encoding: "utf-8", timeout: 3000 }
+            );
+            if (newAttempts >= 5) {
+              injected.push(`#${id}: MAX RETRIES — marked failed`);
+            }
+            errors.push(`#${id} retry ${newAttempts}: ${(data as any).error_message || (data as any).status || "unknown"}`);
+          }
+        } catch (e: any) {
+          errors.push(`#${id}: ${e.message}`);
+        }
+      }
+    } catch (e: any) {
+      errors.push(e.message);
+    }
+    return { retried: injected.length, injected, errors };
+  }
+
+  // Manual trigger: retry all stuck outbound messages
+  app.post("/api/imessage/retry-stuck", async (req, res) => {
+    try {
+      const result = await retryStuckMessages();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Inject a specific message by ID — re-send via SendBlue and clean up
+  app.post("/api/imessage/inject/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const out = execSync(
+        `mysql -N -B -e "SELECT id, to_number, content, attempts FROM tachikoma_alerts.imessage_log WHERE id = ${id.replace(/[^0-9]/g, '')}"`,
+        { encoding: "utf-8", timeout: 3000 }
+      );
+      if (!out.trim()) return res.status(404).json({ error: `Message #${id} not found` });
+
+      const [msgId, toNumber, content, attempts] = out.trim().split("\t");
+      const resp = await fetch("https://api.sendblue.co/api/send-message", {
+        method: "POST",
+        headers: {
+          "sb-api-key-id": SENDBLUE_KEY,
+          "sb-api-secret-key": SENDBLUE_SECRET,
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          from_number: SEND_FROM_NUMBER,
+          number: toNumber,
+          content: content,
+          send_style: "sequential",
+        }),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.status !== "error" && data.status !== "failed") {
+        execSync(
+          `mysql -e "UPDATE tachikoma_alerts.imessage_log SET status = 'responded', date_responded = NOW(), attempts = ${parseInt(attempts || "0") + 1} WHERE id = ${msgId}"`,
+          { encoding: "utf-8", timeout: 3000 }
+        );
+        res.json({ success: true, message: `Message #${id} re-injected and cleared`, handle: data.message_handle || data.id });
+      } else {
+        res.status(502).json({ error: "SendBlue rejected", detail: data });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // TTS proxy — keeps API key server-side, browser provides key optionally
   const ELEVENLABS_KEY_SERVER = process.env["ELEVENLABS_API_KEY"] || process.env["XI_API_KEY"] || "";
 
@@ -566,6 +685,31 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Background auto-retry for stuck outbound iMessages (every 5 min)
+  setInterval(async () => {
+    try {
+      const result = await retryStuckMessages();
+      if (result.retried > 0) {
+        console.log(`[imessage-retry] Re-injected ${result.retried} stuck message(s):`, result.injected);
+      }
+      if (result.errors.length > 0) {
+        console.error(`[imessage-retry] Errors:`, result.errors);
+      }
+    } catch (e: any) {
+      console.error("[imessage-retry] Interval error:", e.message);
+    }
+  }, 5 * 60 * 1000);
+
+  // Run once at startup (after a 30s delay for services to settle)
+  setTimeout(async () => {
+    try {
+      const result = await retryStuckMessages();
+      if (result.retried > 0) {
+        console.log(`[imessage-retry] Startup retry: re-injected ${result.retried} stuck message(s):`, result.injected);
+      }
+    } catch {}
+  }, 30000);
 
   // Create the HTTP server from Express app
   const server = http.createServer(app);
