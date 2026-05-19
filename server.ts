@@ -1075,7 +1075,7 @@ Personality: Concise, precise, helpful, slightly playful. You care about code qu
     });
   }
 
-  server.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "74.208.55.197", () => {
     console.log(`Server running on http://localhost:${PORT} (WebSocket at ws://0.0.0.0:${PORT}/ws)`);
   });
 }
